@@ -1,4 +1,5 @@
-TOKEN = '7922002458:AAG87Cpd7j5shClnOiLnuVb1wre5-X3DwEQ'
+import os
+TOKEN = os.getenv('TOKEN')
 
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
