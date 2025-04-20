@@ -1,5 +1,6 @@
 TOKEN = "7922002458:AAG87Cpd7j5shClnOiLnuVb1wre5-X3DwEQ"
 
+
 from fastapi import FastAPI, Request
 import os
 import httpx
@@ -9,8 +10,9 @@ from bs4 import BeautifulSoup
 import requests
 import re
 
+
 bot = Bot(token=TOKEN)
-user_preferences = {}  # ذخیره پیش فرض تلفظ کاربران
+user_preferences = {}
 app = FastAPI()
 
 def build_longman_link(word):
@@ -22,39 +24,40 @@ def build_oxford_link(word):
 def fetch_longman_data(word):
     url = build_longman_link(word)
     headers = {"User-Agent": "Mozilla/5.0"}
+
     try:
         response = requests.get(url, headers=headers)
         if response.status_code != 200:
             return []
 
         soup = BeautifulSoup(response.text, "html.parser")
-
-        # استخراج POS، فونتیک و صداها از صفحات لانگمن
+        entries = soup.find_all("span", class_="PRON")
         pos_tags = soup.find_all("span", class_="POS")
-        phonetics = soup.find_all("span", class_="PRON")
         speakers = soup.find_all("span", class_="speaker")
 
         data = []
+        added = set()
 
-        # بررسی هر POS و لینک‌های صوتی آن
-        for idx, pos_tag in enumerate(pos_tags):
+        for index, pos_tag in enumerate(pos_tags):
             pos = pos_tag.get_text(strip=True)
-            phonetic = phonetics[idx].get_text(strip=True) if idx < len(phonetics) else None
-
-            # حذف فونتیک اشتباه برای کلماتی مثل ask و مشابه آن
-            if phonetic and phonetic == "ɪnˈkwaɪə":  # فونتیک اشتباه برای کلمه ask
-                phonetic = None
-
+            phonetic = None
             british_audio = None
             american_audio = None
 
-            # استخراج URL صداها
+            # جلوگیری از تکرار pos
+            if pos in added:
+                continue
+            added.add(pos)
+
+            if index < len(entries):
+                phonetic = entries[index].get_text(strip=True)
+
             for spk in speakers:
-                mp3_url = spk.get("data-src-mp3", "")
-                if "breProns" in mp3_url and not british_audio:
-                    british_audio = mp3_url
-                elif "ameProns" in mp3_url and not american_audio:
-                    american_audio = mp3_url
+                src = spk.get("data-src-mp3", "")
+                if "breProns" in src and not british_audio:
+                    british_audio = src
+                elif "ameProns" in src and not american_audio:
+                    american_audio = src
 
             data.append({
                 "pos": pos,
@@ -80,18 +83,20 @@ async def process_word(chat_id, word):
     )
 
     parts_data = fetch_longman_data(word)
-    preferred = user_preferences.get(chat_id, "american")  # پیش‌فرض: American
+    preferred = user_preferences.get(chat_id, "american")
+
+    sent_pos = set()
 
     for entry in parts_data:
         pos = entry['pos']
         phonetic = entry['phonetic']
         audio_url = entry[preferred]
 
-        # اگر فایل صوتی موجود نیست، این part of speech رو رد کن
-        if not audio_url:
+        if not audio_url or pos in sent_pos:
             continue
 
-        # آماده‌سازی کپشن فقط اگر صدا وجود داشته باشه
+        sent_pos.add(pos)
+
         caption = f"🔉 {word} ({pos})"
         if phonetic:
             caption += f"\n📌 /{phonetic}/"
