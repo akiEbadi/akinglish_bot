@@ -1,6 +1,5 @@
 TOKEN = "7922002458:AAG87Cpd7j5shClnOiLnuVb1wre5-X3DwEQ"
 
-
 from fastapi import FastAPI, Request
 import os
 import httpx
@@ -10,9 +9,8 @@ from bs4 import BeautifulSoup
 import requests
 import re
 
-
 bot = Bot(token=TOKEN)
-user_preferences = {}
+user_preferences = {}  # ذخیره پیش فرض تلفظ کاربران
 app = FastAPI()
 
 def build_longman_link(word):
@@ -24,40 +22,39 @@ def build_oxford_link(word):
 def fetch_longman_data(word):
     url = build_longman_link(word)
     headers = {"User-Agent": "Mozilla/5.0"}
-
     try:
         response = requests.get(url, headers=headers)
         if response.status_code != 200:
             return []
 
         soup = BeautifulSoup(response.text, "html.parser")
-        entries = soup.find_all("span", class_="PRON")
+
+        # استخراج POS، فونتیک و صداها از صفحات لانگمن
         pos_tags = soup.find_all("span", class_="POS")
+        phonetics = soup.find_all("span", class_="PRON")
         speakers = soup.find_all("span", class_="speaker")
 
         data = []
-        added = set()
 
-        for index, pos_tag in enumerate(pos_tags):
+        # بررسی هر POS و لینک‌های صوتی آن
+        for idx, pos_tag in enumerate(pos_tags):
             pos = pos_tag.get_text(strip=True)
-            phonetic = None
+            phonetic = phonetics[idx].get_text(strip=True) if idx < len(phonetics) else None
+
+            # حذف فونتیک اشتباه برای کلماتی مثل ask و مشابه آن
+            if phonetic and phonetic == "ɪnˈkwaɪə":  # فونتیک اشتباه برای کلمه ask
+                phonetic = None
+
             british_audio = None
             american_audio = None
 
-            # جلوگیری از تکرار pos
-            if pos in added:
-                continue
-            added.add(pos)
-
-            if index < len(entries):
-                phonetic = entries[index].get_text(strip=True)
-
+            # استخراج URL صداها
             for spk in speakers:
-                src = spk.get("data-src-mp3", "")
-                if "breProns" in src and not british_audio:
-                    british_audio = src
-                elif "ameProns" in src and not american_audio:
-                    american_audio = src
+                mp3_url = spk.get("data-src-mp3", "")
+                if "breProns" in mp3_url and not british_audio:
+                    british_audio = mp3_url
+                elif "ameProns" in mp3_url and not american_audio:
+                    american_audio = mp3_url
 
             data.append({
                 "pos": pos,
@@ -83,41 +80,39 @@ async def process_word(chat_id, word):
     )
 
     parts_data = fetch_longman_data(word)
-    preferred = user_preferences.get(chat_id, "american")
 
-    sent_pos = set()
+    preferred = user_preferences.get(chat_id, "american")  # پیش فرض: امریکن
 
     for entry in parts_data:
         pos = entry['pos']
         phonetic = entry['phonetic']
         audio_url = entry[preferred]
 
-        if not audio_url or pos in sent_pos:
-            continue
-
-        sent_pos.add(pos)
-
+        # فقط اگر فونتیک وجود داشت، ارسال بشه
         caption = f"🔉 {word} ({pos})"
         if phonetic:
             caption += f"\n📌 /{phonetic}/"
 
-        try:
-            headers = {"User-Agent": "Mozilla/5.0"}
-            response = requests.get(audio_url, headers=headers)
-            if response.status_code == 200 and response.headers["Content-Type"].startswith("audio"):
-                safe_word = re.sub(r'[^\w\-]+', '_', word)
-                file_name = f"{safe_word}_{preferred}_{pos}.mp3"
+        # اگر صدا وجود داشت
+        if audio_url:
+            try:
+                headers = {"User-Agent": "Mozilla/5.0"}
+                response = requests.get(audio_url, headers=headers)
+                if response.status_code == 200 and response.headers["Content-Type"].startswith("audio"):
 
-                with open(file_name, "wb") as f:
-                    f.write(response.content)
+                    safe_word = re.sub(r'[^\w\-]+', '_', word)
+                    file_name = f"{safe_word}_{preferred}_{pos}.mp3"
 
-                with open(file_name, "rb") as audio_file:
-                    await bot.send_audio(chat_id=chat_id, audio=audio_file, caption=caption)
+                    with open(file_name, "wb") as f:
+                        f.write(response.content)
 
-                os.remove(file_name)
+                    # ارسال فایل صوتی به همراه کپشن
+                    with open(file_name, "rb") as audio_file:
+                        await bot.send_audio(chat_id=chat_id, audio=audio_file, caption=caption)
 
-        except Exception as e:
-            await bot.send_message(chat_id=chat_id, text=f"❌ خطا در دانلود فایل صوتی: {e}")
+                    os.remove(file_name)
+            except Exception as e:
+                await bot.send_message(chat_id=chat_id, text=f"❌ خطا در دانلود فایل صوتی: {e}")
 
 @app.post("/webhook/{token}")
 async def webhook(token: str, request: Request):
