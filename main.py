@@ -1,19 +1,25 @@
 import os
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
-
-TOKEN = os.getenv("TOKEN")
-PORT = int(os.getenv("PORT", 8080))  # Railway به صورت خودکار پورت تعیین می‌کند.
-WEBHOOK_DOMAIN = os.getenv("WEBHOOK_DOMAIN")  # مثلا: https://yourproject.up.railway.app
-
-if not TOKEN or not WEBHOOK_DOMAIN:
-    raise ValueError("توکن یا آدرس دامنه Railway تنظیم نشده! لطفا در بخش Variables مقدار TOKEN و WEBHOOK_DOMAIN را وارد کن.")
-
-
+from dotenv import load_dotenv
+import httpx
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 import requests
 from bs4 import BeautifulSoup
 import os
+
+
+load_dotenv()
+TOKEN = os.getenv('TOKEN')
+# print("TOKEN:", TOKEN)
+
+
+url = f"https://api.telegram.org/bot{TOKEN}/getMe"
+
+try:
+    response = httpx.get(url, timeout=10)
+    print(response.json())
+except Exception as e:
+    print("⛔ خطا:", e)
 
 
 def build_longman_link(word):
@@ -89,6 +95,7 @@ def fetch_longman_data(word):
         return {}, {}
 
 async def handle_word(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print(f"پیام دریافت شد: {update.message.text}")
     word = update.message.text.strip()
     longman_link = build_longman_link(word)
     oxford_link = build_oxford_link(word)
@@ -155,22 +162,17 @@ async def handle_word(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"⚠️ تلفظ {accent} در لانگمن برای این کلمه موجود نیست.")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print("به بات Akinglish خوش آمدید.")
     await update.message.reply_text("سلام! 👋 کلمه یا عبارت رو بفرست، تلفظ و فونتیک لانگمن و لینک‌هاش رو برات می‌فرستم.")
 
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
+
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_word))
 
-#     print("Bot is running...")
-#     app.run_polling()
+    print("Bot is running...")
+    app.run_polling()
 
-# if __name__ == "__main__":
-#     main()
-
-    # فعال کردن Webhook
-    app.run_webhook(
-    listen="0.0.0.0",
-    port=PORT,
-    webhook_url=f"{WEBHOOK_DOMAIN}/webhook/{TOKEN}"
-)
+if __name__ == "__main__":
+    main()
