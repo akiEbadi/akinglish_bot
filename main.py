@@ -1,67 +1,49 @@
+from fastapi import FastAPI, Request
 import os
 from dotenv import load_dotenv
 import httpx
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
-import requests
+from telegram import Bot
+from telegram.constants import ParseMode
 from bs4 import BeautifulSoup
-import os
-
+import requests
 
 load_dotenv()
+
 TOKEN = os.getenv('TOKEN')
-# print("TOKEN:", TOKEN)
+bot = Bot(token=TOKEN)
 
-
-url = f"https://api.telegram.org/bot{TOKEN}/getMe"
-
-try:
-    response = httpx.get(url, timeout=10)
-    print(response.json())
-except Exception as e:
-    print("⛔ خطا:", e)
-
+app = FastAPI()
 
 def build_longman_link(word):
-    formatted_word = word.lower().replace(" ", "-")
-    return f"https://www.ldoceonline.com/dictionary/{formatted_word}"
+    return f"https://www.ldoceonline.com/dictionary/{word.lower().replace(' ', '-')}"
 
 def build_oxford_link(word):
-    formatted_word = word.lower().replace(" ", "-")
-    return f"https://www.oxfordlearnersdictionaries.com/definition/english/{formatted_word}"
+    return f"https://www.oxfordlearnersdictionaries.com/definition/english/{word.lower().replace(' ', '-')}"
 
 def fetch_longman_phonetics(word):
-    url = f"https://www.ldoceonline.com/dictionary/{word.lower().replace(' ', '-')}"
+    url = build_longman_link(word)
     headers = {"User-Agent": "Mozilla/5.0"}
 
     try:
         response = requests.get(url, headers=headers)
         if response.status_code != 200:
             return None
-
         soup = BeautifulSoup(response.text, "html.parser")
 
-        # هیپنیشن
         hyphen_tag = soup.find("span", class_="HYPHENATION")
         hyphenation = hyphen_tag.text.strip() if hyphen_tag else None
 
-        # فونتیک بریتیش
         pron_tag = soup.find("span", class_="PRON")
         british_ipa = pron_tag.text.strip() if pron_tag else None
 
-        # فونتیک آمریکن
         amevar_tag = soup.find("span", class_="AMEVARPRON")
-        american_ipa = None
-        if amevar_tag:
-            text = amevar_tag.get_text(separator=" ", strip=True).replace("$", "").strip()
-            american_ipa = text if text else None
+        american_ipa = amevar_tag.get_text(separator=" ", strip=True).replace("$", "").strip() if amevar_tag else None
 
         return {
             "hyphenation": hyphenation,
             "british_ipa": british_ipa,
             "american_ipa": american_ipa
         }
-
     except Exception as e:
         print(f"⚠️ خطا در واکشی فونتیک: {e}")
         return None
@@ -69,17 +51,15 @@ def fetch_longman_phonetics(word):
 def fetch_longman_data(word):
     url = build_longman_link(word)
     headers = {"User-Agent": "Mozilla/5.0"}
-
     try:
         response = requests.get(url, headers=headers)
         if response.status_code != 200:
-            return {}, {}
+            return {}
 
         soup = BeautifulSoup(response.text, "html.parser")
         audio_tags = soup.find_all("span", class_="speaker")
-
-        # تلفظ صوتی
         audio_results = {}
+
         for tag in audio_tags:
             if tag.has_attr("data-src-mp3"):
                 mp3_url = tag["data-src-mp3"]
@@ -89,25 +69,20 @@ def fetch_longman_data(word):
                     audio_results["american"] = mp3_url
 
         return audio_results
-
     except Exception as e:
-        print(f"⚠️ خطا در واکشی اطلاعات لانگمن: {str(e)}")
-        return {}, {}
+        print(f"⚠️ خطا در واکشی اطلاعات لانگمن: {e}")
+        return {}
 
-async def handle_word(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    print(f"پیام دریافت شد: {update.message.text}")
-    word = update.message.text.strip()
+async def process_word(chat_id, word):
     longman_link = build_longman_link(word)
     oxford_link = build_oxford_link(word)
 
-    # نمایش لینک‌های Longman و Oxford
-    await update.message.reply_text(
-        f"کلمه: {word}\n\n"
-        f"📚 Longman: {longman_link}\n\n"
-        f"📖 Oxford: {oxford_link}"
+    await bot.send_message(
+        chat_id=chat_id,
+        text=f"کلمه: {word}\n\n📚 Longman: {longman_link}\n\n📖 Oxford: {oxford_link}",
+        parse_mode=ParseMode.HTML
     )
 
-    # واکشی فونتیک‌ها و هیپنیشن از لانگمن
     phonetics = fetch_longman_phonetics(word)
     if phonetics:
         message = f"کلمه: {word}"
@@ -117,23 +92,14 @@ async def handle_word(update: Update, context: ContextTypes.DEFAULT_TYPE):
             message += f"\n🇬🇧 BrE: /{phonetics['british_ipa']}/"
         if phonetics["american_ipa"]:
             message += f"\n🇺🇸 AmE: /{phonetics['american_ipa']}/"
-        await update.message.reply_text(message)
 
-    audio_urls= fetch_longman_data(word)
+        await bot.send_message(chat_id=chat_id, text=message)
 
-    if not audio_urls:
-        await update.message.reply_text("⚠️ تلفظی برای این کلمه در لانگمن پیدا نشد.")
-        return
-    
+    audio_urls = fetch_longman_data(word)
 
     for accent in ["british", "american"]:
         caption = f"🔉 {accent.capitalize()} ({word})"
-     
-        if accent == "british":
-            ipa = phonetics["british_ipa"]
-        elif accent == "american":
-            ipa = phonetics["american_ipa"]
-        
+        ipa = phonetics[accent + "_ipa"] if phonetics else None
         if ipa:
             caption += f"\n💡 {ipa}"
 
@@ -148,31 +114,24 @@ async def handle_word(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     with open(file_name, "wb") as f:
                         f.write(response.content)
 
-                    await update.message.reply_audio(
-                        audio=open(file_name, "rb"),
-                        caption=caption
-                    )
+                    await bot.send_audio(chat_id=chat_id, audio=open(file_name, "rb"), caption=caption)
                     os.remove(file_name)
 
                 else:
-                    await update.message.reply_text(f"⚠️ تلفظ {accent} برای '{word}' پیدا نشد یا دانلود نشد.")
+                    await bot.send_message(chat_id=chat_id, text=f"⚠️ تلفظ {accent} پیدا نشد.")
             except Exception as e:
-                await update.message.reply_text(f"❌ خطا در دانلود تلفظ {accent}: {str(e)}")
+                await bot.send_message(chat_id=chat_id, text=f"❌ خطا در دانلود {accent}: {e}")
         else:
-            await update.message.reply_text(f"⚠️ تلفظ {accent} در لانگمن برای این کلمه موجود نیست.")
+            await bot.send_message(chat_id=chat_id, text=f"⚠️ تلفظ {accent} در لانگمن موجود نیست.")
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    print("به بات Akinglish خوش آمدید.")
-    await update.message.reply_text("سلام! 👋 کلمه یا عبارت رو بفرست، تلفظ و فونتیک لانگمن و لینک‌هاش رو برات می‌فرستم.")
+@app.post("/webhook/{token}")
+async def webhook(token: str, request: Request):
+    if token != os.getenv('TOKEN'):
+        return {"ok": False, "error": "Invalid token"}
 
-def main():
-    app = ApplicationBuilder().token(TOKEN).build()
-
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_word))
-
-    print("Bot is running...")
-    app.run_polling()
-
-if __name__ == "__main__":
-    main()
+    data = await request.json()
+    if "message" in data and "text" in data["message"]:
+        chat_id = data["message"]["chat"]["id"]
+        word = data["message"]["text"].strip()
+        await process_word(chat_id, word)
+    return {"ok": True}
