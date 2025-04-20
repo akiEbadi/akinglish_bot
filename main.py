@@ -1,15 +1,13 @@
 from fastapi import FastAPI, Request
 import os
-from dotenv import load_dotenv
 import httpx
 from telegram import Bot
 from telegram.constants import ParseMode
 from bs4 import BeautifulSoup
 import requests
 
-load_dotenv()
 
-TOKEN = os.getenv('TOKEN')
+TOKEN = "7922002458:AAG87Cpd7j5shClnOiLnuVb1wre5-X3DwEQ"
 bot = Bot(token=TOKEN)
 
 app = FastAPI()
@@ -126,7 +124,7 @@ async def process_word(chat_id, word):
 
 @app.post("/webhook/{token}")
 async def webhook(token: str, request: Request):
-    if token != os.getenv('TOKEN'):
+    if token != TOKEN:
         return {"ok": False, "error": "Invalid token"}
 
     data = await request.json()
