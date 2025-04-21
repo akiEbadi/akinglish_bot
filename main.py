@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 load_dotenv()  
 
 TOKEN = os.getenv("TOKEN")
-print(f"⚙️ توکن: {TOKEN}")
+
 bot = Bot(token=TOKEN)
 user_preferences = {}  # ذخیره پیش فرض تلفظ کاربران
 app = FastAPI()
