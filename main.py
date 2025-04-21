@@ -7,11 +7,10 @@ from bs4 import BeautifulSoup
 import requests
 import re
 
-from dotenv import load_dotenv
-
-load_dotenv()  
-
 TOKEN = os.getenv("TOKEN")
+if not TOKEN:
+    raise ValueError("TOKEN is not set! Please check your Railway Environment Variables.")
+
 
 bot = Bot(token=TOKEN)
 user_preferences = {}  # ذخیره پیش فرض تلفظ کاربران
