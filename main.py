@@ -121,7 +121,7 @@ async def process_word(chat_id, word):
 async def webhook(token: str, request: Request):
     if token != TOKEN:
         return {"ok": False, "error": "Invalid token"}
-    
+    data = await request.json() 
     if "message" in data:
         chat_id = data["message"]["chat"]["id"]
         text = data["message"].get("text", "").strip()
