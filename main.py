@@ -1,5 +1,3 @@
-TOKEN = "7922002458:AAG87Cpd7j5shClnOiLnuVb1wre5-X3DwEQ"
-
 from fastapi import FastAPI, Request
 import os
 import httpx
@@ -9,6 +7,12 @@ from bs4 import BeautifulSoup
 import requests
 import re
 
+from dotenv import load_dotenv
+
+load_dotenv()  
+
+TOKEN = os.getenv("TOKEN")
+print(f"⚙️ توکن: {TOKEN}")
 bot = Bot(token=TOKEN)
 user_preferences = {}  # ذخیره پیش فرض تلفظ کاربران
 app = FastAPI()
@@ -118,14 +122,13 @@ async def process_word(chat_id, word):
 async def webhook(token: str, request: Request):
     if token != TOKEN:
         return {"ok": False, "error": "Invalid token"}
-
-    data = await request.json()
-
+    
     if "message" in data:
         chat_id = data["message"]["chat"]["id"]
         text = data["message"].get("text", "").strip()
 
         if text == "/start":
+            print(f"START: 👤 کاربر جدید: {chat_id}")
             await bot.send_message(
                 chat_id=chat_id,
                 text="سلام! 👋 به ربات تلفظ خوش آمدید.\n\nیک کلمه برای من ارسال کن تا لینک، فونتیک و تلفظ صوتی آن را برات بفرستم.\n\n✅ پیش‌فرض تلفظ 🇺🇸 American است.\nمی‌توانید با ارسال /british تلفظ را به 🇬🇧 British تغییر دهید و با /american برگردانید."
