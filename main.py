@@ -5,11 +5,16 @@ from telegram import Bot
 from telegram.constants import ParseMode
 from bs4 import BeautifulSoup
 import requests
+import re
 
+from dotenv import load_dotenv
 
-TOKEN = "7922002458:AAG87Cpd7j5shClnOiLnuVb1wre5-X3DwEQ"
+load_dotenv()  
+
+TOKEN = os.getenv("TOKEN")
+print(f"⚙️ توکن: {TOKEN}")
 bot = Bot(token=TOKEN)
-
+user_preferences = {}  # ذخیره پیش فرض تلفظ کاربران
 app = FastAPI()
 
 def build_longman_link(word):
@@ -18,58 +23,55 @@ def build_longman_link(word):
 def build_oxford_link(word):
     return f"https://www.oxfordlearnersdictionaries.com/definition/english/{word.lower().replace(' ', '-')}"
 
-def fetch_longman_phonetics(word):
-    url = build_longman_link(word)
-    headers = {"User-Agent": "Mozilla/5.0"}
-
-    try:
-        response = requests.get(url, headers=headers)
-        if response.status_code != 200:
-            return None
-        soup = BeautifulSoup(response.text, "html.parser")
-
-        hyphen_tag = soup.find("span", class_="HYPHENATION")
-        hyphenation = hyphen_tag.text.strip() if hyphen_tag else None
-
-        pron_tag = soup.find("span", class_="PRON")
-        british_ipa = pron_tag.text.strip() if pron_tag else None
-
-        amevar_tag = soup.find("span", class_="AMEVARPRON")
-        american_ipa = amevar_tag.get_text(separator=" ", strip=True).replace("$", "").strip() if amevar_tag else None
-
-        return {
-            "hyphenation": hyphenation,
-            "british_ipa": british_ipa,
-            "american_ipa": american_ipa
-        }
-    except Exception as e:
-        print(f"⚠️ خطا در واکشی فونتیک: {e}")
-        return None
-
 def fetch_longman_data(word):
     url = build_longman_link(word)
     headers = {"User-Agent": "Mozilla/5.0"}
     try:
         response = requests.get(url, headers=headers)
         if response.status_code != 200:
-            return {}
+            return []
 
         soup = BeautifulSoup(response.text, "html.parser")
-        audio_tags = soup.find_all("span", class_="speaker")
-        audio_results = {}
 
-        for tag in audio_tags:
-            if tag.has_attr("data-src-mp3"):
-                mp3_url = tag["data-src-mp3"]
-                if "breProns" in mp3_url:
-                    audio_results["british"] = mp3_url
-                elif "ameProns" in mp3_url:
-                    audio_results["american"] = mp3_url
+        # استخراج POS، فونتیک و صداها از صفحات لانگمن
+        pos_tags = soup.find_all("span", class_="POS")
+        phonetics = soup.find_all("span", class_="PRON")
+        speakers = soup.find_all("span", class_="speaker")
 
-        return audio_results
+        data = []
+
+        # بررسی هر POS و لینک‌های صوتی آن
+        for idx, pos_tag in enumerate(pos_tags):
+            pos = pos_tag.get_text(strip=True)
+            phonetic = phonetics[idx].get_text(strip=True) if idx < len(phonetics) else None
+
+            # حذف فونتیک اشتباه برای کلماتی مثل ask و مشابه آن
+            if phonetic and phonetic == "ɪnˈkwaɪə":  # فونتیک اشتباه برای کلمه ask
+                phonetic = None
+
+            british_audio = None
+            american_audio = None
+
+            # استخراج URL صداها
+            for spk in speakers:
+                mp3_url = spk.get("data-src-mp3", "")
+                if "breProns" in mp3_url and not british_audio:
+                    british_audio = mp3_url
+                elif "ameProns" in mp3_url and not american_audio:
+                    american_audio = mp3_url
+
+            data.append({
+                "pos": pos,
+                "phonetic": phonetic,
+                "british": british_audio,
+                "american": american_audio
+            })
+
+        return data
+
     except Exception as e:
         print(f"⚠️ خطا در واکشی اطلاعات لانگمن: {e}")
-        return {}
+        return []
 
 async def process_word(chat_id, word):
     longman_link = build_longman_link(word)
@@ -77,59 +79,70 @@ async def process_word(chat_id, word):
 
     await bot.send_message(
         chat_id=chat_id,
-        text=f"کلمه: {word}\n\n📚 Longman: {longman_link}\n\n📖 Oxford: {oxford_link}",
+        text=f"کلمه: {word}\n\n📚 Longman: {longman_link}\n📖 Oxford: {oxford_link}",
         parse_mode=ParseMode.HTML
     )
 
-    phonetics = fetch_longman_phonetics(word)
-    if phonetics:
-        message = f"کلمه: {word}"
-        if phonetics["hyphenation"]:
-            message += f"\n🔸 {phonetics['hyphenation']}"
-        if phonetics["british_ipa"]:
-            message += f"\n🇬🇧 BrE: /{phonetics['british_ipa']}/"
-        if phonetics["american_ipa"]:
-            message += f"\n🇺🇸 AmE: /{phonetics['american_ipa']}/"
+    parts_data = fetch_longman_data(word)
 
-        await bot.send_message(chat_id=chat_id, text=message)
+    preferred = user_preferences.get(chat_id, "american")  # پیش فرض: امریکن
 
-    audio_urls = fetch_longman_data(word)
+    for entry in parts_data:
+        pos = entry['pos']
+        phonetic = entry['phonetic']
+        audio_url = entry[preferred]
 
-    for accent in ["british", "american"]:
-        caption = f"🔉 {accent.capitalize()} ({word})"
-        ipa = phonetics[accent + "_ipa"] if phonetics else None
-        if ipa:
-            caption += f"\n💡 {ipa}"
+        # فقط اگر فونتیک وجود داشت، ارسال بشه
+        caption = f"🔉 {word} ({pos})"
+        if phonetic:
+            caption += f"\n📌 /{phonetic}/"
 
-        if accent in audio_urls:
-            url = audio_urls[accent]
+        # اگر صدا وجود داشت
+        if audio_url:
             try:
                 headers = {"User-Agent": "Mozilla/5.0"}
-                response = requests.get(url, headers=headers)
-
+                response = requests.get(audio_url, headers=headers)
                 if response.status_code == 200 and response.headers["Content-Type"].startswith("audio"):
-                    file_name = f"{word}_{accent}.mp3"
+
+                    safe_word = re.sub(r'[^\w\-]+', '_', word)
+                    file_name = f"{safe_word}_{preferred}_{pos}.mp3"
+
                     with open(file_name, "wb") as f:
                         f.write(response.content)
 
-                    await bot.send_audio(chat_id=chat_id, audio=open(file_name, "rb"), caption=caption)
-                    os.remove(file_name)
+                    # ارسال فایل صوتی به همراه کپشن
+                    with open(file_name, "rb") as audio_file:
+                        await bot.send_audio(chat_id=chat_id, audio=audio_file, caption=caption)
 
-                else:
-                    await bot.send_message(chat_id=chat_id, text=f"⚠️ تلفظ {accent} پیدا نشد.")
+                    os.remove(file_name)
             except Exception as e:
-                await bot.send_message(chat_id=chat_id, text=f"❌ خطا در دانلود {accent}: {e}")
-        else:
-            await bot.send_message(chat_id=chat_id, text=f"⚠️ تلفظ {accent} در لانگمن موجود نیست.")
+                await bot.send_message(chat_id=chat_id, text=f"❌ خطا در دانلود فایل صوتی: {e}")
 
 @app.post("/webhook/{token}")
 async def webhook(token: str, request: Request):
     if token != TOKEN:
         return {"ok": False, "error": "Invalid token"}
-
-    data = await request.json()
-    if "message" in data and "text" in data["message"]:
+    
+    if "message" in data:
         chat_id = data["message"]["chat"]["id"]
-        word = data["message"]["text"].strip()
-        await process_word(chat_id, word)
+        text = data["message"].get("text", "").strip()
+
+        if text == "/start":
+            print(f"START: 👤 کاربر جدید: {chat_id}")
+            await bot.send_message(
+                chat_id=chat_id,
+                text="سلام! 👋 به ربات تلفظ خوش آمدید.\n\nیک کلمه برای من ارسال کن تا لینک، فونتیک و تلفظ صوتی آن را برات بفرستم.\n\n✅ پیش‌فرض تلفظ 🇺🇸 American است.\nمی‌توانید با ارسال /british تلفظ را به 🇬🇧 British تغییر دهید و با /american برگردانید."
+            )
+
+        elif text == "/british":
+            user_preferences[chat_id] = "british"
+            await bot.send_message(chat_id=chat_id, text="✅ تلفظ پیش‌فرض روی 🇬🇧 British تنظیم شد!")
+
+        elif text == "/american":
+            user_preferences[chat_id] = "american"
+            await bot.send_message(chat_id=chat_id, text="✅ تلفظ پیش‌فرض روی 🇺🇸 American تنظیم شد!")
+
+        else:
+            await process_word(chat_id, text)
+
     return {"ok": True}

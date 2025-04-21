@@ -12,3 +12,4 @@ venv/
 .dockerignore
 Dockerfile
 dev.py
+guide.md
