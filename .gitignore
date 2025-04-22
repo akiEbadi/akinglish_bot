@@ -13,3 +13,4 @@ venv/
 Dockerfile
 dev.py
 guide.md
+.env*
