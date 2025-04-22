@@ -5,22 +5,10 @@ from telegram import Bot
 from telegram.constants import ParseMode
 from bs4 import BeautifulSoup
 import re
-from dotenv import load_dotenv
 
 app = FastAPI()
 
-os.environ.clear()  # پاک کردن کش محیطی
-load_dotenv(".env")
-ENV = os.getenv("ENV", "production")
-print("ENV:", ENV)
-if ENV == "development":
-    load_dotenv(".env.development")
-else:
-    load_dotenv(".env.production")
-
 TOKEN = os.getenv("TOKEN")
-print("TOKEN:", TOKEN)
-
 if not TOKEN:
     raise ValueError("TOKEN is not set!")
 
