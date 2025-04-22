@@ -21,7 +21,7 @@ def build_longman_link(word):
     return f"https://www.ldoceonline.com/dictionary/{word.lower().replace(' ', '-')}"
 
 def build_oxford_link(word):
-    return f"https://www.oxfordlearnersdictionaries.com/definition/english/{word.lower().replace(' ', '-')}"
+    return f"\nhttps://www.oxfordlearnersdictionaries.com/definition/english/{word.lower().replace(' ', '-')}"
 
 def fetch_longman_data(word):
     url = build_longman_link(word)
@@ -79,7 +79,7 @@ def fetch_longman_data(word):
 
 async def process_word(chat_id, word):
     longman_link = build_longman_link(word)
-    oxford_link = "\n" + build_oxford_link(word)
+    oxford_link =  build_oxford_link(word)
 
     reply = {
                 "chat_id": chat_id, 
