@@ -174,9 +174,7 @@ async def webhook(token: str, request: Request):
                 res = requests.post(API_URL, json=reply)
                 print("📤 جواب به تلگرام ارسال شد:", res.json())
             else:
-                res = requests.post(API_URL, json="process_word")
-                print(">>>>>>>>>>>> process_word")
-                # await process_word(chat_id, text)
+                await process_word(chat_id, text)
         return {"ok": True}
     except Exception as e:
         print("❌ خطا:", e)
