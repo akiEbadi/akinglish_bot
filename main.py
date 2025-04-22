@@ -79,7 +79,7 @@ def fetch_longman_data(word):
 
 async def process_word(chat_id, word):
     longman_link = build_longman_link(word)
-    oxford_link = build_oxford_link(word)
+    oxford_link = "\n" + build_oxford_link(word)
 
     reply = {
                 "chat_id": chat_id, 
