@@ -1,7 +1,8 @@
 from fastapi import FastAPI, Request
 import os
 import requests
-from telegram import ReplyKeyboardMarkup
+from telegram import Bot
+from telegram.constants import ParseMode
 from bs4 import BeautifulSoup
 import re
 
@@ -12,6 +13,8 @@ if not TOKEN:
     raise ValueError("TOKEN is not set!")
 
 user_preferences = {}  # ذخیره پیش‌فرض تلفظ کاربران
+
+
 API_URL = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
 
 def build_longman_link(word):
@@ -30,6 +33,8 @@ def fetch_longman_data(word):
 
         soup = BeautifulSoup(response.text, "html.parser")
         data = []
+
+        # فقط بخش‌های از نوع ldoceEntry Entry
         entries = soup.find_all("span", class_="ldoceEntry Entry")
 
         for entry in entries:
@@ -38,11 +43,13 @@ def fetch_longman_data(word):
             speakers = entry.find_all("span", class_="speaker")
 
             if not pos_tag or not speakers:
-                continue
+                continue  # اگه POS یا تلفظ صوتی نباشه رد کن
 
             pos = pos_tag.get_text(strip=True)
             phonetic = phonetic_tag.get_text(strip=True) if phonetic_tag else None
-            british_audio, american_audio = None, None
+
+            british_audio = None
+            american_audio = None
 
             for spk in speakers:
                 mp3_url = spk.get("data-src-mp3", "")
@@ -51,6 +58,7 @@ def fetch_longman_data(word):
                 elif "ameProns" in mp3_url and not american_audio:
                     american_audio = mp3_url
 
+            # فقط در صورتی که حداقل یکی از صداها وجود داشته باشه
             if british_audio or american_audio:
                 data.append({
                     "pos": pos,
@@ -58,29 +66,29 @@ def fetch_longman_data(word):
                     "british": british_audio,
                     "american": american_audio
                 })
+
         return data
+
     except Exception as e:
         print(f"⚠️ خطا در واکشی اطلاعات لانگمن: {e}")
         return []
 
-def send_message(chat_id, text):
-    keyboard = [["🇬🇧 British", "🇺🇸 American"], ["❓ راهنما"]]
-    reply_markup = {"keyboard": keyboard, "resize_keyboard": True, "one_time_keyboard": False}
-
-    payload = {
-        "chat_id": chat_id,
-        "text": text,
-        "reply_markup": reply_markup
-    }
-    requests.post(API_URL, json=payload)
+    except Exception as e:
+        print(f"⚠️ خطا در واکشی اطلاعات لانگمن: {e}")
+        return []
 
 async def process_word(chat_id, word):
     longman_link = build_longman_link(word)
     oxford_link = build_oxford_link(word)
-    send_message(chat_id, f"کلمه: {word}\n\n📚 Longman: {longman_link}\n📖 Oxford: {oxford_link}")
+
+    reply = {
+                "chat_id": chat_id, 
+                "text": f"کلمه: {word}\n\n📚 Longman: {longman_link}\n📖 Oxford: {oxford_link}"            }
+    res = requests.post(API_URL, json=reply)
 
     parts_data = fetch_longman_data(word)
-    preferred = user_preferences.get(chat_id, "american")
+
+    preferred = user_preferences.get(chat_id, "american")  # پیش‌فرض: امریکن
 
     for entry in parts_data:
         pos = entry['pos']
@@ -95,6 +103,7 @@ async def process_word(chat_id, word):
             try:
                 headers = {"User-Agent": "Mozilla/5.0"}
                 response = requests.get(audio_url, headers=headers)
+
                 if response.status_code == 200 and response.headers["Content-Type"].startswith("audio"):
                     safe_word = re.sub(r'[^\w\-]+', '_', word)
                     file_name = f"{safe_word}_{preferred}_{pos}.mp3"
@@ -103,16 +112,27 @@ async def process_word(chat_id, word):
                         f.write(response.content)
 
                     with open(file_name, "rb") as audio_file:
-                        files = {'audio': audio_file}
-                        data = {'chat_id': chat_id, 'caption': caption}
+                        files = {
+                        'audio': audio_file
+                        }
+                        data = {
+                        'chat_id': chat_id,
+                        'caption': caption
+                        }
                         send_audio_url = f"https://api.telegram.org/bot{TOKEN}/sendAudio"
                         res = requests.post(send_audio_url, data=data, files=files)
                         print("📤 ارسال فایل صوتی:", res.json())
 
                     os.remove(file_name)
-            except Exception as e:
-                send_message(chat_id, f"❌ خطا در دانلود فایل صوتی: {e}")
 
+            except Exception as e:
+                error_reply = {
+                    "chat_id": chat_id,
+                    "text": f"❌ خطا در دانلود فایل صوتی: {e}"
+                }
+                res = requests.post(API_URL, json=error_reply)
+                print("📤 ارسال پیام خطا:", res.json())
+        
 @app.post("/webhook/{token}")
 async def webhook(token: str, request: Request):
     try:
@@ -121,30 +141,40 @@ async def webhook(token: str, request: Request):
 
         data = await request.json()
         print("Received data:", data)
-
         if "message" in data:
             chat_id = data['message']['chat']['id']
             text = data['message'].get('text', '')
 
-            if text == "/start" or text == "❓ راهنما":
-                send_message(
-                    chat_id,
-                    "سلام! 👋 به ربات تلفظ خوش آمدی.\n\nیک کلمه بفرست تا لینک و تلفظش رو برات بیارم.\n\n"
-                    "✅ پیش‌فرض تلفظ 🇺🇸 American است.\n"
-                    "با دکمه‌های زیر هم می‌تونی تغییر بدی!"
-                )
+            if text == "/start":
+                print(f"START: 👤 کاربر جدید: {chat_id}")
+                reply = {
+                    "chat_id": chat_id,
+                    "text": (
+                        "سلام! 👋 به ربات تلفظ خوش آمدید.\n\n"
+                        "یک کلمه برای من ارسال کن تا لینک، فونتیک و تلفظ صوتی آن را برات بفرستم.\n\n"
+                        "✅ پیش‌فرض تلفظ 🇺🇸 American است.\n"
+                        "می‌توانید با ارسال /british تلفظ را به 🇬🇧 British تغییر دهید و با /american برگردانید."
+                    )
+                }
+                res = requests.post(API_URL, json=reply)
+                print("📤 ارسال پیام خوش‌آمد:", res.json())
 
-            elif text in ["🇬🇧 British", "/british"]:
+            elif text == "/british":
                 user_preferences[chat_id] = "british"
-                send_message(chat_id, "✅ تلفظ پیش‌فرض روی 🇬🇧 British تنظیم شد!")
+                reply = {
+                    "chat_id": chat_id,
+                    "text": "✅ تلفظ پیش‌فرض روی 🇬🇧 British تنظیم شد!"
+                }
+                res = requests.post(API_URL, json=reply)
+                print("📤 ارسال تغییر تنظیم British:", res.json())
 
-            elif text in ["🇺🇸 American", "/american"]:
+            elif text == "/american":
                 user_preferences[chat_id] = "american"
-                send_message(chat_id, "✅ تلفظ پیش‌فرض روی 🇺🇸 American تنظیم شد!")
-
+                reply = {"chat_id": chat_id, "text": f"پیامت رسید: {text}"}
+                res = requests.post(API_URL, json=reply)
+                print("📤 جواب به تلگرام ارسال شد:", res.json())
             else:
                 await process_word(chat_id, text)
-
         return {"ok": True}
     except Exception as e:
         print("❌ خطا:", e)
