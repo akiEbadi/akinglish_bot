@@ -34,8 +34,9 @@ def fetch_longman_data(word):
         soup = BeautifulSoup(response.text, "html.parser")
         data = []
 
-        entries = soup.select("span.ldoceEntry.Entry")
-        
+        # فقط بخش‌های از نوع ldoceEntry Entry
+        entries = soup.find_all("span", class_="ldoceEntry Entry")
+
         for entry in entries:
             pos_tag = entry.find("span", class_="POS")
             phonetic_tag = entry.find("span", class_="PRON")
@@ -52,9 +53,10 @@ def fetch_longman_data(word):
 
             for spk in speakers:
                 mp3_url = spk.get("data-src-mp3", "")
-                if "bre" in mp3_url and not british_audio:
+                print(f"🔊 پیدا شده: {mp3_url}")  # برای بررسی URL های صوتی
+                if "breProns" in mp3_url and not british_audio:
                     british_audio = mp3_url
-                elif "ame" in mp3_url and not american_audio:
+                elif "ameProns" in mp3_url and not american_audio:
                     american_audio = mp3_url
 
             # فقط در صورتی که حداقل یکی از صداها وجود داشته باشه
@@ -65,12 +67,44 @@ def fetch_longman_data(word):
                     "british": british_audio,
                     "american": american_audio
                 })
+        # اگر هیچ وویسی پیدا نکردیم، از همه speaker ها استفاده کنیم
+        if not data:
+            print("هیچ وویسی در بخش ldoceEntry Entry پیدا نشد. جستجو در کل صفحه...")
+            speakers = soup.find_all("span", class_="speaker")
 
+            british_audio = None
+            american_audio = None
+
+            # جستجو برای تمامی speaker ها در صفحه
+            for spk in speakers:
+                mp3_url = spk.get("data-src-mp3", "")
+                print(f"🔊 پیدا شده: {mp3_url}")  # برای بررسی URL های صوتی
+                if "breProns" in mp3_url and not british_audio:
+                    british_audio = mp3_url
+                elif "ameProns" in mp3_url and not american_audio:
+                    american_audio = mp3_url
+
+            # در نهایت اگر هیچ کدام پیدا نشد، از اولین وویس موجود استفاده خواهیم کرد
+            if american_audio:
+                data.append({
+                    "pos": "default",
+                    "phonetic": None,
+                    "american": american_audio,
+                    "british": None
+                })
+            elif british_audio:
+                data.append({
+                    "pos": "default",
+                    "phonetic": None,
+                    "british": british_audio,
+                    "american": None
+                })
         return data
 
     except Exception as e:
         print(f"⚠️ خطا در واکشی اطلاعات لانگمن: {e}")
         return []
+
 
 async def process_word(chat_id, word):
     longman_link = build_longman_link(word)
