@@ -104,7 +104,8 @@ async def process_word(chat_id, word):
                 headers = {"User-Agent": "Mozilla/5.0"}
                 response = requests.get(audio_url, headers=headers)
 
-                if response.status_code == 200 and response.headers["Content-Type"].startswith("audio"):
+                content_type = response.headers.get("Content-Type", "")
+                if response.status_code == 200 and content_type.startswith("audio"):
                     safe_word = re.sub(r'[^\w\-]+', '_', word)
                     file_name = f"{safe_word}_{preferred}_{pos}.mp3"
 
