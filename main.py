@@ -34,9 +34,8 @@ def fetch_longman_data(word):
         soup = BeautifulSoup(response.text, "html.parser")
         data = []
 
-        # فقط بخش‌های از نوع ldoceEntry Entry
-        entries = soup.find_all("span", class_="ldoceEntry Entry")
-
+        entries = soup.select("span.ldoceEntry.Entry")
+        
         for entry in entries:
             pos_tag = entry.find("span", class_="POS")
             phonetic_tag = entry.find("span", class_="PRON")
@@ -53,9 +52,9 @@ def fetch_longman_data(word):
 
             for spk in speakers:
                 mp3_url = spk.get("data-src-mp3", "")
-                if "breProns" in mp3_url and not british_audio:
+                if "bre" in mp3_url and not british_audio:
                     british_audio = mp3_url
-                elif "ameProns" in mp3_url and not american_audio:
+                elif "ame" in mp3_url and not american_audio:
                     american_audio = mp3_url
 
             # فقط در صورتی که حداقل یکی از صداها وجود داشته باشه
@@ -68,10 +67,6 @@ def fetch_longman_data(word):
                 })
 
         return data
-
-    except Exception as e:
-        print(f"⚠️ خطا در واکشی اطلاعات لانگمن: {e}")
-        return []
 
     except Exception as e:
         print(f"⚠️ خطا در واکشی اطلاعات لانگمن: {e}")
@@ -104,8 +99,7 @@ async def process_word(chat_id, word):
                 headers = {"User-Agent": "Mozilla/5.0"}
                 response = requests.get(audio_url, headers=headers)
 
-                content_type = response.headers.get("Content-Type", "")
-                if response.status_code == 200 and content_type.startswith("audio"):
+                if response.status_code == 200 and response.headers["Content-Type"].startswith("audio"):
                     safe_word = re.sub(r'[^\w\-]+', '_', word)
                     file_name = f"{safe_word}_{preferred}_{pos}.mp3"
 
