@@ -14,8 +14,211 @@ if not TOKEN:
 
 user_preferences = {}  # ذخیره پیش‌فرض تلفظ کاربران
 
-
 API_URL = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+
+# لیست تبدیل املای آمریکایی به بریتیش
+american_to_british = {
+ 'acknowledgement': 'acknowledgment',
+ 'aluminium': 'aluminum',
+ 'anaemia': 'anemia',
+ 'analog': 'analog',
+ 'analyse': 'analyze',
+ 'analyze': 'analyse',
+ 'anemia': 'anaemia',
+ 'apologise': 'apologize',
+ 'apologize': 'apologise',
+ 'appal': 'appall',
+ 'appals': 'appalls',
+ 'appetiser': 'appetizer',
+ 'appetizer': 'appetiser',
+ 'arbour': 'arbor',
+ 'ardour': 'ardor',
+ 'armour': 'armor',
+ 'behavior': 'behaviour',
+ 'behaviour': 'behavior',
+ 'caecum': 'cecum',
+ 'caesium': 'cesium',
+ 'caliber': 'calibre',
+ 'calibre': 'caliber',
+ 'candour': 'candor',
+ 'catalogue': 'catalog',
+ 'catalyse': 'catalyze',
+ 'catalyze': 'catalyse',
+ 'cecum': 'caecum',
+ 'celiac': 'coeliac',
+ 'center': 'centre',
+ 'centre': 'center',
+ 'cesium': 'caesium',
+ 'civilise': 'civilize',
+ 'civilize': 'civilise',
+ 'clamour': 'clamor',
+ 'coeliac': 'celiac',
+ 'colonise': 'colonize',
+ 'colonize': 'colonise',
+ 'color': 'colour',
+ 'colour': 'color',
+ 'counseling': 'counselling',
+ 'counselling': 'counseling',
+ 'counsellor': 'counselor',
+ 'counselor': 'counsellor',
+ 'criticise': 'criticize',
+ 'criticize': 'criticise',
+ 'defence': 'defense',
+ 'defense': 'defence',
+ 'demeanour': 'demeanor',
+ 'emphasise': 'emphasize',
+ 'emphasize': 'emphasise',
+ 'encyclopaedia': 'encyclopedia',
+ 'encyclopedia': 'encyclopaedia',
+ 'endeavor': 'endeavour',
+ 'endeavour': 'endeavor',
+ 'enrollment': 'enrolment',
+ 'enrolment': 'enrollment',
+ 'equaling': 'equalling',
+ 'equalling': 'equaling',
+ 'estrogen': 'oestrogen',
+ 'favorite': 'favourite',
+ 'favour': 'favor',
+ 'favourite': 'favorite',
+ 'fervour': 'fervor',
+ 'fiber': 'fibre',
+ 'fibre': 'fiber',
+ 'flavor': 'flavour',
+ 'flavour': 'flavor',
+ 'foetus': 'fetus',
+ 'fueled': 'fuelled',
+ 'fueling': 'fuelling',
+ 'fuelled': 'fueled',
+ 'fuelling': 'fueling',
+ 'fulfil': 'fulfill',
+ 'fulfill': 'fulfil',
+ 'fulfils': 'fulfills',
+ 'glamor': 'glamour',
+ 'glamour': 'glamor',
+ 'goitre': 'goiter',
+ 'harbour': 'harbor',
+ 'honor': 'honour',
+ 'honour': 'honor',
+ 'humor': 'humour',
+ 'humour': 'humor',
+ 'installment': 'instalment',
+ 'instalment': 'installment',
+ 'instil': 'instill',
+ 'instils': 'instills',
+ 'jewellery': 'jewelry',
+ 'jewelry': 'jewellery',
+ 'kilometer': 'kilometre',
+ 'kilometre': 'kilometer',
+ 'labor': 'labour',
+ 'labour': 'labor',
+ 'leukaemia': 'leukemia',
+ 'leukemia': 'leukaemia',
+ 'licence': 'license',
+ 'license': 'licence',
+ 'liter': 'litre',
+ 'litre': 'liter',
+ 'louver': 'louvre',
+ 'louvre': 'louver',
+ 'luster': 'lustre',
+ 'lustre': 'luster',
+ 'maneuver': 'manoeuvre',
+ 'manoeuvre': 'maneuver',
+ 'marvellous': 'marvelous',
+ 'meager': 'meagre',
+ 'meagre': 'meager',
+ 'mediaeval': 'medieval',
+ 'medieval': 'mediaeval',
+ 'memorise': 'memorize',
+ 'memorize': 'memorise',
+ 'meter': 'metre',
+ 'metre': 'meter',
+ 'minimise': 'minimize',
+ 'minimize': 'minimise',
+ 'modeling': 'modelling',
+ 'modelling': 'modeling',
+ 'mould': 'mold',
+ 'moult': 'molt',
+ 'moustache': 'mustache',
+ 'neighbor': 'neighbour',
+ 'neighbour': 'neighbor',
+ 'odor': 'odour',
+ 'odour': 'odor',
+ 'oesophagus': 'esophagus',
+ 'oestrogen': 'estrogen',
+ 'offence': 'offense',
+ 'offense': 'offence',
+ 'organise': 'organize',
+ 'organize': 'organise',
+ 'paediatric': 'pediatric',
+ 'paediatrician': 'pediatrician',
+ 'paedophile': 'pedophile',
+ 'paralyse': 'paralyze',
+ 'paralyze': 'paralyse',
+ 'parlour': 'parlor',
+ 'patronise': 'patronize',
+ 'patronize': 'patronise',
+ 'pediatric': 'paediatric',
+ 'pedophile': 'paedophile',
+ 'plough': 'plow',
+ 'practice': 'practise',
+ 'practise': 'practice',
+ 'pretence': 'pretense',
+ 'pretense': 'pretence',
+ 'prise': 'prize',
+ 'prize': 'prise',
+ 'pyjamas': 'pajamas',
+ 'quarreling': 'quarrelling',
+ 'quarrelling': 'quarreling',
+ 'rancour': 'rancor',
+ 'realise': 'realize',
+ 'realize': 'realise',
+ 'recognise': 'recognize',
+ 'recognize': 'recognise',
+ 'revelled': 'reveled',
+ 'revelling': 'reveling',
+ 'rigour': 'rigor',
+ 'rumor': 'rumour',
+ 'rumour': 'rumor',
+ 'saber': 'sabre',
+ 'sabre': 'saber',
+ 'saviour': 'savior',
+ 'savor': 'savour',
+ 'savour': 'savor',
+ 'scepter': 'sceptre',
+ 'sceptre': 'scepter',
+ 'signaling': 'signalling',
+ 'signalling': 'signaling',
+ 'skilful': 'skillful',
+ 'skillful': 'skilful',
+ 'smoulder': 'smolder',
+ 'socialise': 'socialize',
+ 'socialize': 'socialise',
+ 'somber': 'sombre',
+ 'sombre': 'somber',
+ 'specialise': 'specialize',
+ 'specialize': 'specialise',
+ 'specter': 'spectre',
+ 'spectre': 'specter',
+ 'splendor': 'splendour',
+ 'splendour': 'splendor',
+ 'succour': 'succor',
+ 'theater': 'theatre',
+ 'theatre': 'theater',
+ 'traveled': 'travelled',
+ 'traveler': 'traveller',
+ 'traveling': 'travelling',
+ 'travelle': 'traveler',
+ 'travelled': 'traveled',
+ 'traveller': 'traveler',
+ 'travelling': 'traveling',
+ 'tumour': 'tumor',
+ 'valour': 'valor',
+ 'vapour': 'vapor',
+ 'vigor': 'vigour',
+ 'vigour': 'vigor',
+ 'whisky': 'whiskey',
+ 'wilful': 'willful'}
+
 
 def build_longman_link(word):
     return f"https://www.ldoceonline.com/dictionary/{word.lower().replace(' ', '-')}"
@@ -34,7 +237,6 @@ def fetch_longman_data(word):
         soup = BeautifulSoup(response.text, "html.parser")
         data = []
 
-        # فقط بخش‌های از نوع ldoceEntry Entry
         entries = soup.find_all("span", class_="ldoceEntry Entry")
 
         for entry in entries:
@@ -43,7 +245,7 @@ def fetch_longman_data(word):
             speakers = entry.find_all("span", class_="speaker")
 
             if not pos_tag or not speakers:
-                continue  # اگه POS یا تلفظ صوتی نباشه رد کن
+                continue
 
             pos = pos_tag.get_text(strip=True)
             phonetic = phonetic_tag.get_text(strip=True) if phonetic_tag else None
@@ -58,7 +260,6 @@ def fetch_longman_data(word):
                 elif "ameProns" in mp3_url and not american_audio:
                     american_audio = mp3_url
 
-            # فقط در صورتی که حداقل یکی از صداها وجود داشته باشه
             if british_audio or american_audio:
                 data.append({
                     "pos": pos,
@@ -73,22 +274,27 @@ def fetch_longman_data(word):
         print(f"⚠️ خطا در واکشی اطلاعات لانگمن: {e}")
         return []
 
-    except Exception as e:
-        print(f"⚠️ خطا در واکشی اطلاعات لانگمن: {e}")
-        return []
-
 async def process_word(chat_id, word):
+    original_word = word
+    parts_data = fetch_longman_data(word)
+
+    # اگر داده‌ای برای تلفظ نبود و معادل بریتیش وجود داشت، اونو امتحان کن
+    if not parts_data and word in american_to_british:
+        alt_word = american_to_british[word]
+        parts_data = fetch_longman_data(alt_word)
+        if parts_data:
+            word = alt_word  # اگر نتیجه داشت، اون کلمه جایگزین بشه
+
     longman_link = build_longman_link(word)
     oxford_link = build_oxford_link(word)
 
     reply = {
-                "chat_id": chat_id, 
-                "text": f"کلمه: {word}\n\n📚 Longman: {longman_link}\n📖 Oxford: {oxford_link}"            }
+        "chat_id": chat_id,
+        "text": f"کلمه: {original_word}\n\n📚 Longman: {longman_link}\n📖 Oxford: {oxford_link}"
+    }
     res = requests.post(API_URL, json=reply)
 
-    parts_data = fetch_longman_data(word)
-
-    preferred = user_preferences.get(chat_id, "american")  # پیش‌فرض: امریکن
+    preferred = user_preferences.get(chat_id, "american")
 
     for entry in parts_data:
         pos = entry['pos']
@@ -112,13 +318,8 @@ async def process_word(chat_id, word):
                         f.write(response.content)
 
                     with open(file_name, "rb") as audio_file:
-                        files = {
-                        'audio': audio_file
-                        }
-                        data = {
-                        'chat_id': chat_id,
-                        'caption': caption
-                        }
+                        files = {'audio': audio_file}
+                        data = {'chat_id': chat_id, 'caption': caption}
                         send_audio_url = f"https://api.telegram.org/bot{TOKEN}/sendAudio"
                         res = requests.post(send_audio_url, data=data, files=files)
                         print("📤 ارسال فایل صوتی:", res.json())
@@ -132,7 +333,7 @@ async def process_word(chat_id, word):
                 }
                 res = requests.post(API_URL, json=error_reply)
                 print("📤 ارسال پیام خطا:", res.json())
-        
+
 @app.post("/webhook/{token}")
 async def webhook(token: str, request: Request):
     try:
@@ -173,6 +374,7 @@ async def webhook(token: str, request: Request):
                 reply = {"chat_id": chat_id, "text": f"پیامت رسید: {text}"}
                 res = requests.post(API_URL, json=reply)
                 print("📤 جواب به تلگرام ارسال شد:", res.json())
+
             else:
                 await process_word(chat_id, text)
         return {"ok": True}
