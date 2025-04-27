@@ -113,7 +113,7 @@ american_to_british = {
  'labour': 'labor',
  'leukaemia': 'leukemia',
  'leukemia': 'leukaemia',
- 'licence': 'license',
+ 'licence': 'license', # noun in UK is 'licence', verb is 'license'
  'license': 'licence',
  'liter': 'litre',
  'litre': 'liter',
@@ -160,7 +160,7 @@ american_to_british = {
  'pediatric': 'paediatric',
  'pedophile': 'paedophile',
  'plough': 'plow',
- 'practice': 'practise',
+ 'practice': 'practise',   # noun in US/UK: practice; verb in UK: practise
  'practise': 'practice',
  'pretence': 'pretense',
  'pretense': 'pretence',
@@ -240,6 +240,16 @@ def fetch_longman_data(word):
         entries = soup.find_all("span", class_="ldoceEntry Entry")
 
         for entry in entries:
+            headword_tag = entry.find("span", class_="HWD")
+            if not headword_tag:
+                continue
+
+            headword = headword_tag.get_text(strip=True).lower()
+            if headword != word.lower() and headword != american_to_british[word]:
+                print(">>>>>>>>>>>>>>>>> headword & word", headword)
+                print("<<<<<<<<<<<<<<<<< word" , word)
+                continue  # فقط مدخل‌هایی که دقیقا خود کلمه هستند
+            
             pos_tag = entry.find("span", class_="POS")
             phonetic_tag = entry.find("span", class_="PRON")
             speakers = entry.find_all("span", class_="speaker")
