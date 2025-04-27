@@ -246,8 +246,8 @@ def fetch_longman_data(word):
 
             headword = headword_tag.get_text(strip=True).lower()
             if headword != word.lower() and headword != american_to_british[word]:
-                print(">>>>>>>>>>>>>>>>> headword & word", headword)
-                print("<<<<<<<<<<<<<<<<< word" , word)
+                print(">>>>>>>>>>>>>>>>> headword: ", headword)
+                print("<<<<<<<<<<<<<<<<< word: ", word)
                 continue  # فقط مدخل‌هایی که دقیقا خود کلمه هستند
             
             pos_tag = entry.find("span", class_="POS")
@@ -288,12 +288,11 @@ async def process_word(chat_id, word):
     original_word = word
     parts_data = fetch_longman_data(word)
 
-    # اگر داده‌ای برای تلفظ نبود و معادل بریتیش وجود داشت، اونو امتحان کن
     if not parts_data and word in american_to_british:
         alt_word = american_to_british[word]
         parts_data = fetch_longman_data(alt_word)
         if parts_data:
-            word = alt_word  # اگر نتیجه داشت، اون کلمه جایگزین بشه
+            word = alt_word
 
     longman_link = build_longman_link(word)
     oxford_link = build_oxford_link(word)
@@ -302,47 +301,51 @@ async def process_word(chat_id, word):
         "chat_id": chat_id,
         "text": f"کلمه: {original_word}\n\n📚 Longman: {longman_link}\n📖 Oxford: {oxford_link}"
     }
-    res = requests.post(API_URL, json=reply)
+    requests.post(API_URL, json=reply)
 
     preferred = user_preferences.get(chat_id, "american")
 
-    for entry in parts_data:
+    for idx, entry in enumerate(parts_data):
         pos = entry['pos']
         phonetic = entry['phonetic']
-        audio_url = entry[preferred]
+        audio_url = entry.get(preferred)
 
-        caption = f"🔉 {word} ({pos})"
-        if phonetic:
-            caption += f"\n📌 /{phonetic}/"
+        if not audio_url:
+            continue  # اگر وویسی نیست، چیزی نفرست
 
-        if audio_url:
-            try:
-                headers = {"User-Agent": "Mozilla/5.0"}
-                response = requests.get(audio_url, headers=headers)
+        try:
+            headers = {"User-Agent": "Mozilla/5.0"}
+            response = requests.get(audio_url, headers=headers)
 
-                if response.status_code == 200 and response.headers["Content-Type"].startswith("audio"):
-                    safe_word = re.sub(r'[^\w\-]+', '_', word)
-                    file_name = f"{safe_word}_{preferred}_{pos}.mp3"
+            if response.status_code == 200 and response.headers["Content-Type"].startswith("audio"):
+                safe_word = re.sub(r'[^\w\-]+', '_', word)
+                file_name = f"{safe_word}_{preferred}_{pos}_{idx}.mp3"  # idx اضافه شده که یکتا باشد
 
-                    with open(file_name, "wb") as f:
-                        f.write(response.content)
+                with open(file_name, "wb") as f:
+                    f.write(response.content)
 
-                    with open(file_name, "rb") as audio_file:
-                        files = {'audio': audio_file}
-                        data = {'chat_id': chat_id, 'caption': caption}
-                        send_audio_url = f"https://api.telegram.org/bot{TOKEN}/sendAudio"
-                        res = requests.post(send_audio_url, data=data, files=files)
-                        print("📤 ارسال فایل صوتی:", res.json())
+                with open(file_name, "rb") as audio_file:
+                    files = {'audio': audio_file}
+                    
+                    # اینجا کپشن را بستگی به وجود فونتیک می‌سازیم
+                    caption = f"🔉 {word} ({pos})"
+                    if phonetic:
+                        caption += f"\n📌 /{phonetic}/"
 
-                    os.remove(file_name)
+                    data = {'chat_id': chat_id, 'caption': caption}
+                    send_audio_url = f"https://api.telegram.org/bot{TOKEN}/sendAudio"
+                    res = requests.post(send_audio_url, data=data, files=files)
+                    print("📤 ارسال فایل صوتی:", res.json())
 
-            except Exception as e:
-                error_reply = {
-                    "chat_id": chat_id,
-                    "text": f"❌ خطا در دانلود فایل صوتی: {e}"
-                }
-                res = requests.post(API_URL, json=error_reply)
-                print("📤 ارسال پیام خطا:", res.json())
+                os.remove(file_name)
+
+        except Exception as e:
+            error_reply = {
+                "chat_id": chat_id,
+                "text": f"❌ خطا در دانلود یا ارسال فایل صوتی: {e}"
+            }
+            requests.post(API_URL, json=error_reply)
+            print("📤 ارسال پیام خطا:", res.json())
 
 @app.post("/webhook/{token}")
 async def webhook(token: str, request: Request):
