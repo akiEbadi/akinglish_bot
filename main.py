@@ -372,22 +372,24 @@ async def process_word(chat_id, word):
     if(fetch_oxford_audio_enabled):  
         # اگر هیچ وویسی در لانگمن نبود، وویس آکسفورد را امتحان کن
         oxford_Data = fetch_oxford_audio(word,preferred)
+        print("Oxford Data:", oxford_Data)
         if oxford_Data:
             try:
-                pos = oxford_Data.pos
-                phonetic = oxford_Data.phonetic
-                audio_url = oxford_Data.audio_url
+                pos = oxford_Data.pos ? oxford_Data.pos : " "
+                phonetic = oxford_Data.phonetic ? oxford_Data.phonetic : " "
+                audio_url = oxford_Data.audio_url ? oxford_Data.audio_url : " "
 
-            caption = f"🔉 {word} ({pos})"
-            if phonetic:
-                caption += f"\n📌 /{phonetic}/"
-            
-                headers = {"User-Agent": "Mozilla/5.0"}
-                response = requests.get(oxford_audio_url, headers=headers)
+                caption = f"🔉 {word} ({pos})"
+                if phonetic:
+                    caption += f"\n📌 /{phonetic}/"
+
+                if oxford_audio_url
+                    headers = {"User-Agent": "Mozilla/5.0"}
+                    response = requests.get(oxford_audio_url, headers=headers)
                     
-                if response.status_code == 200 and response.headers["Content-Type"].startswith("audio"):
-                    safe_word = re.sub(r'[^\w\-]+', '_', word)
-                    file_name = f"{safe_word}_oxford_{user_pos}.mp3"
+                    if response.status_code == 200 and response.headers["Content-Type"].startswith("audio"):
+                        safe_word = re.sub(r'[^\w\-]+', '_', word)
+                        file_name = f"{safe_word}_oxford_{user_pos}.mp3"
                     
                     with open(file_name, "wb") as f:
                         f.write(response.content)
@@ -444,12 +446,12 @@ def fetch_oxford_audio(word, preferred_accent):
             return data   
 
         # پیدا کردن اولین جزء کلام (POS)
-        pos_tags = soup.find_all("span", class_="pos")
+        pos = soup.find("span", class_="pos")
         
-        if pos_tags:
-            pos = pos_tags[0].text.strip()  # اولین جزء کلام
-        else:
-            pos = None
+        # if pos_tag:
+        #     pos = pos_tag  # اولین جزء کلام
+        # else:
+        #     pos = None
 
         # بازگشت اطلاعات به همراه POS و تلفظ صوتی
         data = {
