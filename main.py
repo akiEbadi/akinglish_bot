@@ -238,14 +238,14 @@ def has_invalid_parent_class(element):
             return True
     return False
 
-def getAudioUrl(audio_url, preferred, pos, word, chat_id, caption):
+def getAudioUrl(audio_url, preferred, pos, word, chat_id, caption, dictionary_name):
     if audio_url:
         try:
             headers = {"User-Agent": "Mozilla/5.0"}
             response = requests.get(audio_url, headers=headers)
             if response.status_code == 200 and response.headers["Content-Type"].startswith("audio"):
                 safe_word = re.sub(r'[^\w\-]+', '_', word)
-                file_name = f"{safe_word}_{preferred}_{pos}.mp3"
+                file_name = f"{safe_word}_{preferred}_{pos}_{dictionary_name}.mp3"
 
                 with open(file_name, "wb") as f:
                     f.write(response.content)
@@ -425,7 +425,7 @@ async def process_word(chat_id, word):
         caption = f"🔉 {word} ({pos})"
         if phonetic:
             caption += f"\n📌 /{phonetic}/"
-        getAudioUrl(audio_url, preferred, pos, word, chat_id, caption)
+        getAudioUrl(audio_url, preferred, pos, word, chat_id, caption,"longman")
     
     if(fetch_oxford_audio_enabled):  
         # اگر هیچ وویسی در لانگمن نبود، وویس آکسفورد را امتحان کن
@@ -437,7 +437,7 @@ async def process_word(chat_id, word):
             caption = f"🔉 {word} ({pos})"
             if phonetic:
                 caption += f"\n📌 /{phonetic}/"
-            getAudioUrl(audio_url, preferred, pos, word, chat_id, caption)      
+            getAudioUrl(audio_url, preferred, pos, word, chat_id, caption,"oxford")      
 
 @app.post("/webhook/{token}")
 async def webhook(token: str, request: Request):
