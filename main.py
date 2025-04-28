@@ -371,25 +371,15 @@ async def process_word(chat_id, word):
     
     if(fetch_oxford_audio_enabled):  
         # اگر هیچ وویسی در لانگمن نبود، وویس آکسفورد را امتحان کن
-        oxford_Data = fetch_oxford_audio(word,preferred)
-        print("Oxford Data:", oxford_Data)
-        if oxford_Data:
+        oxford_audio_url, oxford_phonetic= fetch_oxford_audio(word,preferred)
+        if oxford_audio_url:
             try:
-                pos = oxford_Data.pos if oxford_Data.pos else None 
-                phonetic = oxford_Data.phonetic if oxford_Data.phonetic else None
-                audio_url = oxford_Data.audio_url if oxford_Data.audio_url else None
-
-                caption = f"🔉 {word} ({pos})"
-                if phonetic:
-                    caption += f"\n📌 /{phonetic}/"
-
-                if oxford_audio_url
-                    headers = {"User-Agent": "Mozilla/5.0"}
-                    response = requests.get(oxford_audio_url, headers=headers)
+                headers = {"User-Agent": "Mozilla/5.0"}
+                response = requests.get(oxford_audio_url, headers=headers)
                     
-                    if response.status_code == 200 and response.headers["Content-Type"].startswith("audio"):
-                        safe_word = re.sub(r'[^\w\-]+', '_', word)
-                        file_name = f"{safe_word}_oxford_{user_pos}.mp3"
+                if response.status_code == 200 and response.headers["Content-Type"].startswith("audio"):
+                    safe_word = re.sub(r'[^\w\-]+', '_', word)
+                    file_name = f"{safe_word}_oxford_{user_pos}.mp3"
                     
                     with open(file_name, "wb") as f:
                         f.write(response.content)
@@ -414,56 +404,39 @@ async def process_word(chat_id, word):
 def fetch_oxford_audio(word, preferred_accent):
     url = build_oxford_link(word)
     headers = {"User-Agent": "Mozilla/5.0"}
-    data = {
-            "audio_url": None,
-            "phonetic": None,
-            "pos": None
-        }  
+    data = []
     
     try:
         response = requests.get(url, headers=headers)
         if response.status_code != 200:
             print(f"❌ دریافت صفحه آکسفورد ناموفق بود. Status: {response.status_code}")
-            return data
+            return None, None
 
         soup = BeautifulSoup(response.text, "html.parser")
 
-        # استخراج لینک mp3
+           # استخراج لینک mp3
         accent_class = 'pron-us' if preferred_accent == 'us' else 'pron-uk'
     
         audio_div = soup.find('div', class_=lambda c: c and
                          'sound' in c.split() and
                          'audio_play_button' in c.split() and
                          accent_class in c.split())
-        # اگر div پیدا بشه، بررسی ویژگی data-src-mp3
+    # اگر div پیدا بشه، بررسی ویژگی data-src-mp3
         if audio_div and audio_div.has_attr('data-src-mp3'):
             audio_url = audio_div['data-src-mp3']
             # بررسی اینکه فونتیک هم موجود باشه
             phonetic = audio_div.get('title', None)
-        
-        else:
+            return audio_url, phonetic
+
+        if not audio_url:
             print("❌ صدا برای لهجه انتخاب‌شده در آکسفورد پیدا نشد.")
-            return data   
+            return None, None
 
-        # پیدا کردن اولین جزء کلام (POS)
-        pos = soup.find("span", class_="pos")
-        
-        # if pos_tag:
-        #     pos = pos_tag  # اولین جزء کلام
-        # else:
-        #     pos = None
-
-        # بازگشت اطلاعات به همراه POS و تلفظ صوتی
-        data = {
-            "audio_url": audio_url,
-            "phonetic": phonetic,
-            "pos": pos
-        }
-        return data
+        return audio_url, phonetic
 
     except Exception as e:
         print(f"❌ خطا در واکشی تلفظ آکسفورد: {e}")
-        return data
+        return None, None
 
 @app.post("/webhook/{token}")
 async def webhook(token: str, request: Request):
