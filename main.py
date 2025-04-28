@@ -412,13 +412,17 @@ async def process_word(chat_id, word):
 def fetch_oxford_audio(word, preferred_accent):
     url = build_oxford_link(word)
     headers = {"User-Agent": "Mozilla/5.0"}
-    data = []
+    data = {
+            "audio_url": None,
+            "phonetic": None,
+            "pos": None
+        }  
     
     try:
         response = requests.get(url, headers=headers)
         if response.status_code != 200:
             print(f"❌ دریافت صفحه آکسفورد ناموفق بود. Status: {response.status_code}")
-            return None, None
+            return data
 
         soup = BeautifulSoup(response.text, "html.parser")
 
@@ -437,7 +441,7 @@ def fetch_oxford_audio(word, preferred_accent):
         
         else:
             print("❌ صدا برای لهجه انتخاب‌شده در آکسفورد پیدا نشد.")
-            return None, None   
+            return data   
 
         # پیدا کردن اولین جزء کلام (POS)
         pos_tags = soup.find_all("span", class_="pos")
@@ -448,15 +452,16 @@ def fetch_oxford_audio(word, preferred_accent):
             pos = None
 
         # بازگشت اطلاعات به همراه POS و تلفظ صوتی
-        return {
+        data = {
             "audio_url": audio_url,
             "phonetic": phonetic,
             "pos": pos
-        }    
+        }
+        return data
 
     except Exception as e:
         print(f"❌ خطا در واکشی تلفظ آکسفورد: {e}")
-        return None, None
+        return data
 
 @app.post("/webhook/{token}")
 async def webhook(token: str, request: Request):
