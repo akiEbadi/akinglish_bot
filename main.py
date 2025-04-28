@@ -13,6 +13,8 @@ if not TOKEN:
     raise ValueError("TOKEN is not set!")
 
 user_preferences = {}  # ذخیره پیش‌فرض تلفظ کاربران
+user_pos = {}  # ذخیره موقعیت تلفظ کاربران (br/us)
+
 
 API_URL = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
 
@@ -226,6 +228,16 @@ def build_longman_link(word):
 def build_oxford_link(word):
     return f"https://www.oxfordlearnersdictionaries.com/definition/english/{word.lower().replace(' ', '-')}"
 
+def has_invalid_parent_class(element):
+    # بررسی والد‌های عنصر تا رسیدن به ریشه
+    parents = element.find_parents()
+    for parent in parents:
+        # بررسی اینکه آیا کلاس‌ها شامل Tail یا DERIV هستند
+        classes = parent.get('class', [])
+        if isinstance(classes, list) and any(cls in classes for cls in ['Tail', 'DERIV']):
+            return True
+    return False
+
 def fetch_longman_data(word):
     url = build_longman_link(word)
     headers = {"User-Agent": "Mozilla/5.0"}
@@ -238,7 +250,7 @@ def fetch_longman_data(word):
         data = []
 
         entries = soup.find_all("span", class_="ldoceEntry Entry")
-
+        
         for entry in entries:
             headword_tag = entry.find("span", class_="HWD")
             if not headword_tag:
@@ -246,8 +258,6 @@ def fetch_longman_data(word):
 
             headword = headword_tag.get_text(strip=True).lower()
             if headword != word.lower() and headword != american_to_british[word]:
-                print(">>>>>>>>>>>>>>>>> headword: ", headword)
-                print("<<<<<<<<<<<<<<<<< word: ", word)
                 continue  # فقط مدخل‌هایی که دقیقا خود کلمه هستند
             
             pos_tag = entry.find("span", class_="POS")
@@ -256,10 +266,18 @@ def fetch_longman_data(word):
 
             if not pos_tag or not speakers:
                 continue
+            
+            isPhoneticValid = True
+            if phonetic_tag is not None:
+                isPhoneticValid = has_invalid_parent_class(phonetic_tag)
+                if(isPhoneticValid):
+                    phonetic_tag = None
+                
+
 
             pos = pos_tag.get_text(strip=True)
             phonetic = phonetic_tag.get_text(strip=True) if phonetic_tag else None
-
+            
             british_audio = None
             american_audio = None
 
@@ -284,15 +302,18 @@ def fetch_longman_data(word):
         print(f"⚠️ خطا در واکشی اطلاعات لانگمن: {e}")
         return []
 
+# تغییر در تابع اصلی برای استفاده از وویس آکسفورد در صورت عدم پیدا شدن وویس در لانگمن
 async def process_word(chat_id, word):
+    fetch_oxford_audio_enabled = False
     original_word = word
     parts_data = fetch_longman_data(word)
 
+    # اگر داده‌ای برای تلفظ نبود و معادل بریتیش وجود داشت، اونو امتحان کن
     if not parts_data and word in american_to_british:
         alt_word = american_to_british[word]
         parts_data = fetch_longman_data(alt_word)
         if parts_data:
-            word = alt_word
+            word = alt_word  # اگر نتیجه داشت، اون کلمه جایگزین بشه
 
     longman_link = build_longman_link(word)
     oxford_link = build_oxford_link(word)
@@ -301,51 +322,121 @@ async def process_word(chat_id, word):
         "chat_id": chat_id,
         "text": f"کلمه: {original_word}\n\n📚 Longman: {longman_link}\n📖 Oxford: {oxford_link}"
     }
-    requests.post(API_URL, json=reply)
+    res = requests.post(API_URL, json=reply)
 
     preferred = user_preferences.get(chat_id, "american")
-
-    for idx, entry in enumerate(parts_data):
+    user_pos = "br" if preferred == "british" else "us"
+    
+    if len(parts_data) == 0: fetch_oxford_audio_enabled = True
+    
+    for entry in parts_data:
         pos = entry['pos']
         phonetic = entry['phonetic']
-        audio_url = entry.get(preferred)
+        audio_url = entry[preferred]
+
+        caption = f"🔉 {word} ({pos})"
+        if phonetic:
+            caption += f"\n📌 /{phonetic}/"
+            
+        if audio_url:
+            try:
+                headers = {"User-Agent": "Mozilla/5.0"}
+                response = requests.get(audio_url, headers=headers)
+
+                if response.status_code == 200 and response.headers["Content-Type"].startswith("audio"):
+                    safe_word = re.sub(r'[^\w\-]+', '_', word)
+                    file_name = f"{safe_word}_{preferred}_{pos}.mp3"
+
+                    with open(file_name, "wb") as f:
+                        f.write(response.content)
+
+                    with open(file_name, "rb") as audio_file:
+                        files = {'audio': audio_file}
+                        data = {'chat_id': chat_id, 'caption': caption}
+                        send_audio_url = f"https://api.telegram.org/bot{TOKEN}/sendAudio"
+                        res = requests.post(send_audio_url, data=data, files=files)
+                        print("📤 ارسال فایل صوتی:", res.json())
+
+                    os.remove(file_name)
+
+            except Exception as e:
+                error_reply = {
+                    "chat_id": chat_id,
+                    "text": f"❌ خطا در دانلود فایل صوتی: {e}"
+                }
+                res = requests.post(API_URL, json=error_reply)
+                print("📤 ارسال پیام خطا:", res.json())
+        else:
+            fetch_oxford_audio_enabled = True
+    
+    if(fetch_oxford_audio_enabled):  
+        # اگر هیچ وویسی در لانگمن نبود، وویس آکسفورد را امتحان کن
+        oxford_audio_url, oxford_phonetic= fetch_oxford_audio(word,preferred)
+        if oxford_audio_url:
+            try:
+                headers = {"User-Agent": "Mozilla/5.0"}
+                response = requests.get(oxford_audio_url, headers=headers)
+                    
+                if response.status_code == 200 and response.headers["Content-Type"].startswith("audio"):
+                    safe_word = re.sub(r'[^\w\-]+', '_', word)
+                    file_name = f"{safe_word}_oxford_{user_pos}.mp3"
+                    
+                    with open(file_name, "wb") as f:
+                        f.write(response.content)
+                        
+                    with open(file_name, "rb") as audio_file:
+                        files = {'audio': audio_file}
+                        data = {'chat_id': chat_id, 'caption': oxford_phonetic}
+                        send_audio_url = f"https://api.telegram.org/bot{TOKEN}/sendAudio"
+                        res = requests.post(send_audio_url, data=data, files=files)
+                        print("📤 ارسال فایل صوتی از آکسفورد:", res.json())
+
+                    os.remove(file_name)
+
+            except Exception as e:
+                error_reply = {
+                    "chat_id": chat_id,
+                    "text": f"❌ خطا در دانلود فایل صوتی از آکسفورد: {e}"
+                }
+                res = requests.post(API_URL, json=error_reply)
+                print("📤 ارسال پیام خطا:", res.json())            
+                
+def fetch_oxford_audio(word, preferred_accent):
+    url = build_oxford_link(word)
+    headers = {"User-Agent": "Mozilla/5.0"}
+    data = []
+    
+    try:
+        response = requests.get(url, headers=headers)
+        if response.status_code != 200:
+            print(f"❌ دریافت صفحه آکسفورد ناموفق بود. Status: {response.status_code}")
+            return None, None
+
+        soup = BeautifulSoup(response.text, "html.parser")
+
+           # استخراج لینک mp3
+        accent_class = 'pron-us' if preferred_accent == 'us' else 'pron-uk'
+    
+        audio_div = soup.find('div', class_=lambda c: c and
+                         'sound' in c.split() and
+                         'audio_play_button' in c.split() and
+                         accent_class in c.split())
+    # اگر div پیدا بشه، بررسی ویژگی data-src-mp3
+        if audio_div and audio_div.has_attr('data-src-mp3'):
+            audio_url = audio_div['data-src-mp3']
+            # بررسی اینکه فونتیک هم موجود باشه
+            phonetic = audio_div.get('title', None)
+            return audio_url, phonetic
 
         if not audio_url:
-            continue  # اگر وویسی نیست، چیزی نفرست
+            print("❌ صدا برای لهجه انتخاب‌شده در آکسفورد پیدا نشد.")
+            return None, None
 
-        try:
-            headers = {"User-Agent": "Mozilla/5.0"}
-            response = requests.get(audio_url, headers=headers)
+        return audio_url, phonetic
 
-            if response.status_code == 200 and response.headers["Content-Type"].startswith("audio"):
-                safe_word = re.sub(r'[^\w\-]+', '_', word)
-                file_name = f"{safe_word}_{preferred}_{pos}_{idx}.mp3"  # idx اضافه شده که یکتا باشد
-
-                with open(file_name, "wb") as f:
-                    f.write(response.content)
-
-                with open(file_name, "rb") as audio_file:
-                    files = {'audio': audio_file}
-                    
-                    # اینجا کپشن را بستگی به وجود فونتیک می‌سازیم
-                    caption = f"🔉 {word} ({pos})"
-                    if phonetic:
-                        caption += f"\n📌 /{phonetic}/"
-
-                    data = {'chat_id': chat_id, 'caption': caption}
-                    send_audio_url = f"https://api.telegram.org/bot{TOKEN}/sendAudio"
-                    res = requests.post(send_audio_url, data=data, files=files)
-                    print("📤 ارسال فایل صوتی:", res.json())
-
-                os.remove(file_name)
-
-        except Exception as e:
-            error_reply = {
-                "chat_id": chat_id,
-                "text": f"❌ خطا در دانلود یا ارسال فایل صوتی: {e}"
-            }
-            requests.post(API_URL, json=error_reply)
-            print("📤 ارسال پیام خطا:", res.json())
+    except Exception as e:
+        print(f"❌ خطا در واکشی تلفظ آکسفورد: {e}")
+        return None, None
 
 @app.post("/webhook/{token}")
 async def webhook(token: str, request: Request):
