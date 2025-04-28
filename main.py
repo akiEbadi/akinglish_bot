@@ -238,14 +238,14 @@ def has_invalid_parent_class(element):
             return True
     return False
 
-def getAudioUrl(audio_url, preferred, pos, word, chat_id, caption, dictionary_name):
+def getAudioUrl(audio_url, preferred, pos, word, chat_id, caption):
     if audio_url:
         try:
             headers = {"User-Agent": "Mozilla/5.0"}
             response = requests.get(audio_url, headers=headers)
             if response.status_code == 200 and response.headers["Content-Type"].startswith("audio"):
                 safe_word = re.sub(r'[^\w\-]+', '_', word)
-                file_name = f"{safe_word}_{preferred}_{pos}_{dictionary_name}.mp3"
+                file_name = f"{safe_word}_{preferred}_{pos}.mp3"
 
                 with open(file_name, "wb") as f:
                     f.write(response.content)
@@ -422,10 +422,10 @@ async def process_word(chat_id, word):
         phonetic = entry['phonetic']
         audio_url = entry[preferred]
 
-        caption = f"🔉 {word} ({pos})"
+        caption = f"🔉 {word} ({pos}) - {"longman"}"
         if phonetic:
-            caption += f"\n📌 /{phonetic}/"
-        getAudioUrl(audio_url, preferred, pos, word, chat_id, caption,"longman")
+            caption += f"\n📌 /{phonetic}/ "
+        getAudioUrl(audio_url, preferred, pos, word, chat_id, caption)
     
     if(fetch_oxford_audio_enabled):  
         # اگر هیچ وویسی در لانگمن نبود، وویس آکسفورد را امتحان کن
@@ -434,10 +434,10 @@ async def process_word(chat_id, word):
             pos = oxford_data.get('pos') if oxford_data.get('pos') else ""
             phonetic = oxford_data.get('phonetic') if oxford_data.get('phonetic') else ""
             audio_url = oxford_data.get('audio_url') if oxford_data.get('audio_url') else ""
-            caption = f"🔉 {word} ({pos})"
+            caption = f"🔉 {word} ({pos}) - {"oxford"}"
             if phonetic:
                 caption += f"\n📌 /{phonetic}/"
-            getAudioUrl(audio_url, preferred, pos, word, chat_id, caption,"oxford")      
+            getAudioUrl(audio_url, preferred, pos, word, chat_id, caption)      
 
 @app.post("/webhook/{token}")
 async def webhook(token: str, request: Request):
