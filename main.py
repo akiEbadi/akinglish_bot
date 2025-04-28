@@ -375,9 +375,9 @@ async def process_word(chat_id, word):
         print("Oxford Data:", oxford_Data)
         if oxford_Data:
             try:
-                pos = oxford_Data.pos ? oxford_Data.pos : " "
-                phonetic = oxford_Data.phonetic ? oxford_Data.phonetic : " "
-                audio_url = oxford_Data.audio_url ? oxford_Data.audio_url : " "
+                pos = oxford_Data.pos if oxford_Data.pos else None 
+                phonetic = oxford_Data.phonetic if oxford_Data.phonetic else None
+                audio_url = oxford_Data.audio_url if oxford_Data.audio_url else None
 
                 caption = f"🔉 {word} ({pos})"
                 if phonetic:
