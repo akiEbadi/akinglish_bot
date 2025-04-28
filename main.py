@@ -454,10 +454,6 @@ def fetch_oxford_audio(word, preferred_accent):
             "pos": pos
         }    
 
-
-
-        return audio_url, phonetic
-
     except Exception as e:
         print(f"❌ خطا در واکشی تلفظ آکسفورد: {e}")
         return None, None
