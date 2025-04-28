@@ -371,9 +371,17 @@ async def process_word(chat_id, word):
     
     if(fetch_oxford_audio_enabled):  
         # اگر هیچ وویسی در لانگمن نبود، وویس آکسفورد را امتحان کن
-        oxford_audio_url, oxford_phonetic= fetch_oxford_audio(word,preferred)
-        if oxford_audio_url:
+        oxford_Data = fetch_oxford_audio(word,preferred)
+        if oxford_Data:
             try:
+                pos = oxford_Data.pos
+                phonetic = oxford_Data.phonetic
+                audio_url = oxford_Data.audio_url
+
+            caption = f"🔉 {word} ({pos})"
+            if phonetic:
+                caption += f"\n📌 /{phonetic}/"
+            
                 headers = {"User-Agent": "Mozilla/5.0"}
                 response = requests.get(oxford_audio_url, headers=headers)
                     
@@ -414,23 +422,39 @@ def fetch_oxford_audio(word, preferred_accent):
 
         soup = BeautifulSoup(response.text, "html.parser")
 
-           # استخراج لینک mp3
+        # استخراج لینک mp3
         accent_class = 'pron-us' if preferred_accent == 'us' else 'pron-uk'
     
         audio_div = soup.find('div', class_=lambda c: c and
                          'sound' in c.split() and
                          'audio_play_button' in c.split() and
                          accent_class in c.split())
-    # اگر div پیدا بشه، بررسی ویژگی data-src-mp3
+        # اگر div پیدا بشه، بررسی ویژگی data-src-mp3
         if audio_div and audio_div.has_attr('data-src-mp3'):
             audio_url = audio_div['data-src-mp3']
             # بررسی اینکه فونتیک هم موجود باشه
             phonetic = audio_div.get('title', None)
-            return audio_url, phonetic
-
-        if not audio_url:
+        
+        else:
             print("❌ صدا برای لهجه انتخاب‌شده در آکسفورد پیدا نشد.")
-            return None, None
+            return None, None   
+
+        # پیدا کردن اولین جزء کلام (POS)
+        pos_tags = soup.find_all("span", class_="pos")
+        
+        if pos_tags:
+            pos = pos_tags[0].text.strip()  # اولین جزء کلام
+        else:
+            pos = None
+
+        # بازگشت اطلاعات به همراه POS و تلفظ صوتی
+        return {
+            "audio_url": audio_url,
+            "phonetic": phonetic,
+            "pos": pos
+        }    
+
+
 
         return audio_url, phonetic
 
