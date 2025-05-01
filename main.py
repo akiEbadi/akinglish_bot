@@ -15,7 +15,8 @@ TOKEN = os.getenv("TOKEN")
 if not TOKEN:
     raise ValueError("TOKEN is not set!")
 
-ADMINS = os.getenv("ADMINS")
+ADMINS = os.getenv("ADMINS", "")
+ADMINS = [int(x.strip()) for x in ADMINS.split(",") if x.strip().isdigit()]
 
 user_preferences = {}  # ذخیره پیش‌فرض تلفظ کاربران
 user_pos = {}  # ذخیره موقعیت تلفظ کاربران (br/us)
