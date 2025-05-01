@@ -527,7 +527,7 @@ async def webhook(token: str, request: Request):
                 res = requests.post(API_URL, json=reply)
                 print("📤 جواب به تلگرام ارسال شد:")
                 
-            elif text == "/stats" and ADMINS:
+            elif text == "/stats":
                 if user_id not in ADMINS:
                     reply = {
                         "chat_id": chat_id,
