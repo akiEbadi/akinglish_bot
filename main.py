@@ -38,7 +38,7 @@ def save_user(user_id):
         if os.path.exists(USER_FILE):
             with open(USER_FILE, "r") as f:
                 users = json.load(f)
-        if user_id not in ADMINS and str(user_id) not in users:
+        if str(user_id) not in ADMINS and str(user_id) not in users:
             users[str(user_id)] = datetime.now().strftime("%Y-%m-%d")
             with open(USER_FILE, "w") as f:
                 json.dump(users, f)
@@ -540,7 +540,7 @@ async def webhook(token: str, request: Request):
             elif text == "/stats":
                 print("user_id is:", user_id)
                 print("ADMINS is:", ADMINS)
-                if user_id not in ADMINS:
+                if str(user_id) not in ADMINS:
                     reply = {
                         "chat_id": chat_id,
                         "text": "⛔️ فقط ادمین می‌تواند از این دستور استفاده کند."
