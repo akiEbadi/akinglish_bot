@@ -17,7 +17,11 @@ if not TOKEN:
 
 ADMINS = os.getenv("ADMINS", "")
 print("initial ADMINS is:", ADMINS)
+isAdmin = user_id in ADMINS
+print("user_id in ADMINS:", isAdmin)
 ADMINS = [int(x.strip()) for x in ADMINS.split(",") if x.strip().isdigit()]
+print("after: ADMINS is:", ADMINS)
+print("after: user_id in ADMINS:", user_id in ADMINS)
 
 user_preferences = {}  # ذخیره پیش‌فرض تلفظ کاربران
 user_pos = {}  # ذخیره موقعیت تلفظ کاربران (br/us)
@@ -489,7 +493,7 @@ async def webhook(token: str, request: Request):
     try:
         if token != TOKEN:
             return {"ok": False, "error": "Invalid token"}
-
+        global ADMINS
         data = await request.json()
         # print("Received data:", data)
         if "message" in data:
