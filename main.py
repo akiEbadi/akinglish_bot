@@ -24,10 +24,6 @@ else:
 
 isAdmin = "300509511" in ADMINS
 print("user_id in ADMINS:", isAdmin)
-ADMINS = [int(x.strip()) for x in ADMINS.split(",") if x.strip().isdigit()]
-print("after: ADMINS is:", ADMINS)
-isAdmin_after = 300509511 in ADMINS
-print("after: user_id in ADMINS:", isAdmin_after)
 
 user_preferences = {}  # ذخیره پیش‌فرض تلفظ کاربران
 user_pos = {}  # ذخیره موقعیت تلفظ کاربران (br/us)
@@ -534,7 +530,9 @@ async def webhook(token: str, request: Request):
 
             elif text == "/american":
                 user_preferences[chat_id] = "american"
-                reply = {"chat_id": chat_id, "text": f"پیامت رسید: {text}"}
+                reply = {
+                    "chat_id": chat_id,
+                    "text": "✅ تلفظ پیش‌فرض روی 🇬🇧 American تنظیم شد!"
                 res = requests.post(API_URL, json=reply)
                 print("📤 جواب به تلگرام ارسال شد:")
                 
