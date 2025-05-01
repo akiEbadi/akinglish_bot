@@ -17,11 +17,17 @@ if not TOKEN:
 
 ADMINS = os.getenv("ADMINS", "")
 print("initial ADMINS is:", ADMINS)
-isAdmin = user_id in ADMINS
+if ADMINS:
+    print("ADMINS[0] is:", ADMINS[0])
+else:
+    print("ADMINS is empty.")
+
+isAdmin = "300509511" in ADMINS
 print("user_id in ADMINS:", isAdmin)
 ADMINS = [int(x.strip()) for x in ADMINS.split(",") if x.strip().isdigit()]
 print("after: ADMINS is:", ADMINS)
-print("after: user_id in ADMINS:", user_id in ADMINS)
+isAdmin_after = 300509511 in ADMINS
+print("after: user_id in ADMINS:", isAdmin_after)
 
 user_preferences = {}  # ذخیره پیش‌فرض تلفظ کاربران
 user_pos = {}  # ذخیره موقعیت تلفظ کاربران (br/us)
@@ -287,7 +293,7 @@ def has_invalid_parent_class(element):
             return True
     return False
 
-def getAudioUrl(audio_url, preferred, pos, word, chat_id, caption):
+def get_audio_url(audio_url, preferred, pos, word, chat_id, caption):
     if audio_url:
         try:
             headers = {"User-Agent": "Mozilla/5.0"}
@@ -319,10 +325,10 @@ def getAudioUrl(audio_url, preferred, pos, word, chat_id, caption):
         fetch_oxford_audio_enabled = True
         reply = {
             "chat_id": chat_id,
-            "text": f"❌تلفط صوتی کلمه وجود ندارد"
+            "text": f"❌تلفظ صوتی کلمه وجود ندارد"
         }
         res = requests.post(API_URL, json=reply)
-        print("📤تلفط صوتی کلمه وجود ندارد", res.json())
+        print("📤تلفظ صوتی کلمه وجود ندارد", res.json())
   
   
 def fetch_longman_data(word):
@@ -344,7 +350,7 @@ def fetch_longman_data(word):
                 continue
 
             headword = headword_tag.get_text(strip=True).lower()
-            if headword != word.lower() and headword != american_to_british[word]:
+            if headword != word.lower() and headword != american_to_british.get(word, word):
                 continue  # فقط مدخل‌هایی که دقیقا خود کلمه هستند
             
             pos_tag = entry.find("span", class_="POS")
@@ -437,7 +443,7 @@ def fetch_oxford_audio(word, preferred_accent):
 
     except Exception as e:
         print(f"❌ خطا در واکشی تلفظ آکسفورد: {e}")
-        return None, None
+        return None
 
 # تغییر در تابع اصلی برای استفاده از وویس آکسفورد در صورت عدم پیدا شدن وویس در لانگمن
 async def process_word(chat_id, word):
@@ -462,7 +468,7 @@ async def process_word(chat_id, word):
     res = requests.post(API_URL, json=reply)
 
     preferred = user_preferences.get(chat_id, "american")
-    user_pos = "br" if preferred == "british" else "us"
+    # user_pos = "br" if preferred == "british" else "us"
     
     if len(parts_data) == 0: fetch_oxford_audio_enabled = True
     
@@ -471,10 +477,10 @@ async def process_word(chat_id, word):
         phonetic = entry['phonetic']
         audio_url = entry[preferred]
 
-        caption = f"🔉 {word} ({pos}) - {"longman"}"
+        caption = f"🔉 {word} ({pos}) - longman"
         if phonetic:
             caption += f"\n📌 /{phonetic}/ "
-        getAudioUrl(audio_url, preferred, pos, word, chat_id, caption)
+        get_audio_url(audio_url, preferred, pos, word, chat_id, caption)
     
     if(fetch_oxford_audio_enabled):  
         # اگر هیچ وویسی در لانگمن نبود، وویس آکسفورد را امتحان کن
@@ -483,10 +489,10 @@ async def process_word(chat_id, word):
             pos = oxford_data.get('pos') if oxford_data.get('pos') else ""
             phonetic = oxford_data.get('phonetic') if oxford_data.get('phonetic') else ""
             audio_url = oxford_data.get('audio_url') if oxford_data.get('audio_url') else ""
-            caption = f"🔉 {word} ({pos}) - {"oxford"}"
+            caption = f"🔉 {word} ({pos}) - oxford"
             if phonetic:
                 caption += f"\n📌 /{phonetic}/"
-            getAudioUrl(audio_url, preferred, pos, word, chat_id, caption)      
+            get_audio_url(audio_url, preferred, pos, word, chat_id, caption)      
 
 @app.post("/webhook/{token}")
 async def webhook(token: str, request: Request):
