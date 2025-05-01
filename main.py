@@ -16,6 +16,7 @@ if not TOKEN:
     raise ValueError("TOKEN is not set!")
 
 ADMINS = os.getenv("ADMINS", "")
+print("initial ADMINS is:", ADMINS)
 ADMINS = [int(x.strip()) for x in ADMINS.split(",") if x.strip().isdigit()]
 
 user_preferences = {}  # ذخیره پیش‌فرض تلفظ کاربران
@@ -528,6 +529,8 @@ async def webhook(token: str, request: Request):
                 print("📤 جواب به تلگرام ارسال شد:")
                 
             elif text == "/stats":
+                print("user_id is:", user_id)
+                print("ADMINS is:", ADMINS)
                 if user_id not in ADMINS:
                     reply = {
                         "chat_id": chat_id,
@@ -545,7 +548,7 @@ async def webhook(token: str, request: Request):
                         )
                     }   
                 res = requests.post(API_URL, json=reply)
-                print("📤 ارسال شد آمار:")
+                print("📤 ارسال شد آمار:", res.json)
             else:
                 await process_word(chat_id, text)
         return {"ok": True}
