@@ -55,7 +55,7 @@ def get_user_stats():
         yesterday = (date.today() - timedelta(days=1)).isoformat()
 
         today_count = sum(1 for d in users.values() if d == today)
-        yesterday_count = sum(1 for d in users.values() if d == yesterday) + 1
+        yesterday_count = sum(1 for d in users.values() if d == yesterday)
 
         return {
             "total": total + 1,
