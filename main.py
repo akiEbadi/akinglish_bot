@@ -16,14 +16,6 @@ if not TOKEN:
     raise ValueError("TOKEN is not set!")
 
 ADMINS = os.getenv("ADMINS", "")
-print("initial ADMINS is:", ADMINS)
-if ADMINS:
-    print("ADMINS[0] is:", ADMINS[0])
-else:
-    print("ADMINS is empty.")
-
-isAdmin = "300509511" in ADMINS
-print("user_id in ADMINS:", isAdmin)
 
 user_preferences = {}  # ذخیره پیش‌فرض تلفظ کاربران
 user_pos = {}  # ذخیره موقعیت تلفظ کاربران (br/us)
@@ -45,10 +37,12 @@ def save_user(user_id):
         if str(user_id) not in ADMINS and str(user_id) not in users:
             print("Saving user", user_id)
             print("str(user_id) not in ADMINS", str(user_id) not in ADMINS)
-            print("users", users)
+            print("before users", users)
             users[str(user_id)] = datetime.now().strftime("%Y-%m-%d")
             with open(USER_FILE, "w") as f:
                 json.dump(users, f)
+            print("after users", users)
+            print("User saved successfully")
     except Exception as e:
         print("❌ خطا در ذخیره کاربر:", e)
 
@@ -68,9 +62,9 @@ def get_user_stats():
         yesterday_count = sum(1 for d in users.values() if d == yesterday) + 1
 
         return {
-            "total": total if total > 1 else 1,
-            "today": today_count if today_count > 1 else 1,
-            "yesterday": yesterday_count if yesterday_count > 1 else 1
+            "total": total + 1,
+            "today": today_count + 1,
+            "yesterday": yesterday_count + 1
         }
     except Exception as e:
         print("❌ خطا در خواندن آمار:", e)
