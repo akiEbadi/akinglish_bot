@@ -1,3 +1,4 @@
+
 from fastapi import FastAPI, Request
 import os
 import requests
@@ -5,6 +6,8 @@ from telegram import Bot
 from telegram.constants import ParseMode
 from bs4 import BeautifulSoup
 import re
+from datetime import datetime, date, timedelta
+import json
 
 app = FastAPI()
 
@@ -12,12 +15,51 @@ TOKEN = os.getenv("TOKEN")
 if not TOKEN:
     raise ValueError("TOKEN is not set!")
 
+ADMINS = os.getenv("ADMINS")
+
 user_preferences = {}  # ذخیره پیش‌فرض تلفظ کاربران
 user_pos = {}  # ذخیره موقعیت تلفظ کاربران (br/us)
-
+USER_FILE = "users.json"
 
 API_URL = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
 
+# ----------------- UTILITIES -----------------
+def save_user(user_id):
+    try:
+        users = {}
+        if os.path.exists(USER_FILE):
+            with open(USER_FILE, "r") as f:
+                users = json.load(f)
+        if user_id not in ADMINS and str(user_id) not in users:
+            users[str(user_id)] = datetime.now().strftime("%Y-%m-%d")
+            with open(USER_FILE, "w") as f:
+                json.dump(users, f)
+    except Exception as e:
+        print("❌ خطا در ذخیره کاربر:", e)
+
+def get_user_stats():
+    try:
+        if not os.path.exists(USER_FILE):
+            return {"total": 0, "today": 0, "yesterday": 0}
+
+        with open(USER_FILE, "r") as f:
+            users = json.load(f)
+        total = len(users)
+        today = date.today().isoformat()
+        yesterday = (date.today() - timedelta(days=1)).isoformat()
+
+        today_count = sum(1 for d in users.values() if d == today)
+        yesterday_count = sum(1 for d in users.values() if d == yesterday) + 1
+
+        return {
+            "total": total if total > 1 else 1,
+            "today": today_count if today_count > 1 else 1,
+            "yesterday": yesterday_count if yesterday_count > 1 else 1
+        }
+    except Exception as e:
+        print("❌ خطا در خواندن آمار:", e)
+        return {"total": 1, "today": 1, "yesterday": 1}
+# ----------------- LONGMAN PARSER -----------------
 # لیست تبدیل املای آمریکایی به بریتیش
 american_to_british = {
  'acknowledgement': 'acknowledgment',
@@ -220,14 +262,15 @@ american_to_british = {
  'vigour': 'vigor',
  'whisky': 'whiskey',
  'wilful': 'willful'}
-
-
+        
 def build_longman_link(word):
     return f"https://www.ldoceonline.com/dictionary/{word.lower().replace(' ', '-')}"
 
+# ----------------- OXFORD PARSER -----------------
 def build_oxford_link(word):
     return f"https://www.oxfordlearnersdictionaries.com/definition/english/{word.lower().replace(' ', '-')}"
 
+# ----------------- Process Word and Fetch dictionaries info -----------------
 def has_invalid_parent_class(element):
     # بررسی والد‌های عنصر تا رسیدن به ریشه
     parents = element.find_parents()
@@ -446,13 +489,16 @@ async def webhook(token: str, request: Request):
             return {"ok": False, "error": "Invalid token"}
 
         data = await request.json()
-        print("Received data:", data)
+        # print("Received data:", data)
         if "message" in data:
             chat_id = data['message']['chat']['id']
             text = data['message'].get('text', '')
+            user_id = data['message']['from']['id']
 
             if text == "/start":
-                print(f"START: 👤 کاربر جدید: {chat_id}")
+                save_user(user_id)
+
+              
                 reply = {
                     "chat_id": chat_id,
                     "text": (
@@ -463,7 +509,7 @@ async def webhook(token: str, request: Request):
                     )
                 }
                 res = requests.post(API_URL, json=reply)
-                print("📤 ارسال پیام خوش‌آمد:", res.json())
+                print("📤 ارسال پیام خوش‌آمد:")
 
             elif text == "/british":
                 user_preferences[chat_id] = "british"
@@ -472,14 +518,33 @@ async def webhook(token: str, request: Request):
                     "text": "✅ تلفظ پیش‌فرض روی 🇬🇧 British تنظیم شد!"
                 }
                 res = requests.post(API_URL, json=reply)
-                print("📤 ارسال تغییر تنظیم British:", res.json())
+                print("📤 ارسال تغییر تنظیم British:")
 
             elif text == "/american":
                 user_preferences[chat_id] = "american"
                 reply = {"chat_id": chat_id, "text": f"پیامت رسید: {text}"}
                 res = requests.post(API_URL, json=reply)
-                print("📤 جواب به تلگرام ارسال شد:", res.json())
-
+                print("📤 جواب به تلگرام ارسال شد:")
+                
+            elif text == "/stats" and ADMINS:
+                if user_id not in ADMINS:
+                    reply = {
+                        "chat_id": chat_id,
+                        "text": "⛔️ فقط ادمین می‌تواند از این دستور استفاده کند."
+                    }
+                else:
+                    stats = get_user_stats()
+                    reply = {
+                        "chat_id": chat_id,
+                        "text": (
+                            f"📊 آمار کاربران:\n\n"
+                            f"👥 کل کاربران: {stats['total']}\n"
+                            f"🟢 امروز: {stats['today']}\n"
+                            f"🕒 دیروز: {stats['yesterday']}"
+                        )
+                    }   
+                res = requests.post(API_URL, json=reply)
+                print("📤 ارسال شد آمار:")
             else:
                 await process_word(chat_id, text)
         return {"ok": True}
