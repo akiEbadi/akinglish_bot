@@ -533,6 +533,7 @@ async def webhook(token: str, request: Request):
                 reply = {
                     "chat_id": chat_id,
                     "text": "✅ تلفظ پیش‌فرض روی 🇬🇧 American تنظیم شد!"
+                }
                 res = requests.post(API_URL, json=reply)
                 print("📤 جواب به تلگرام ارسال شد:")
                 
