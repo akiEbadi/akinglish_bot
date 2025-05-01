@@ -38,7 +38,14 @@ def save_user(user_id):
         if os.path.exists(USER_FILE):
             with open(USER_FILE, "r") as f:
                 users = json.load(f)
+        else:
+            print(">>>>>>>>>>>> There was no users file")
+            with open(USER_FILE, "w") as f:
+                json.dump({}, f)
         if str(user_id) not in ADMINS and str(user_id) not in users:
+            print("Saving user", user_id)
+            print("str(user_id) not in ADMINS", str(user_id) not in ADMINS)
+            print("users", users)
             users[str(user_id)] = datetime.now().strftime("%Y-%m-%d")
             with open(USER_FILE, "w") as f:
                 json.dump(users, f)
@@ -53,6 +60,7 @@ def get_user_stats():
         with open(USER_FILE, "r") as f:
             users = json.load(f)
         total = len(users)
+        print(">>>>>>>>>>>> total user count:", total)
         today = date.today().isoformat()
         yesterday = (date.today() - timedelta(days=1)).isoformat()
 
@@ -539,7 +547,6 @@ async def webhook(token: str, request: Request):
                 
             elif text == "/stats":
                 print("user_id is:", user_id)
-                print("ADMINS is:", ADMINS)
                 if str(user_id) not in ADMINS:
                     reply = {
                         "chat_id": chat_id,
