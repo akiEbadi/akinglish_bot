@@ -462,7 +462,6 @@ async def process_word(chat_id, word):
     res = requests.post(API_URL, json=reply)
 
     preferred = user_preferences.get(chat_id, "american")
-    # user_pos = "br" if preferred == "british" else "us"
     
     if len(parts_data) == 0: fetch_oxford_audio_enabled = True
     
