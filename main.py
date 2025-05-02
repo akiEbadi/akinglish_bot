@@ -555,6 +555,7 @@ async def webhook(token: str, request: Request):
                 res = requests.post(API_URL, json=reply)
                 print("📤 ارسال شد آمار:", res.json)
             else:
+                save_user(user_id)
                 await process_word(chat_id, text)
         return {"ok": True}
     except Exception as e:
