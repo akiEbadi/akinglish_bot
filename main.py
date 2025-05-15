@@ -284,8 +284,7 @@ if READ_LIST_FROM_ENV and BIO_SPELLING:
         equivalnet_spelling_list = json.load(f)
 
 # Irregular plural forms
-irregular_plural_list = 
-{
+irregular_plural_list = {
   "children": "child",
   "feet": "foot",
   "geese": "goose",
@@ -335,7 +334,7 @@ irregular_plural_list =
   "scarves": "scarf",
   "calves": "calf",
   "hooves": "hoof"
-}
+
 BIO_SPELLING = os.getenv("Irregular_Plural_List")
 if READ_LIST_FROM_ENV and BIO_SPELLING:
     with open(BIO_SPELLING, "r") as f:
