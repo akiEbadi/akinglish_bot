@@ -457,9 +457,10 @@ def fetch_longman_data(word):
                 continue
         
             headword = headword_tag.get_text(strip=True).lower()
-            if headword != word.lower() and headword != equivalnet_spelling_list.get(word, None):
+            if headword != word.lower() and headword != equivalnet_spelling_list.get(word, word):
                 continue  # فقط مدخل‌هایی که دقیقا خود کلمه هستند
-            
+            print(">>> headword:", headword)
+
             pos_tag = entry.find("span", class_="POS")
             phonetic_tag = entry.find("span", class_="PRON")
             print(">>> phonetic_tag:", phonetic_tag)
