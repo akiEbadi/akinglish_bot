@@ -517,7 +517,9 @@ def fetch_oxford_audio(word, preferred_accent):
             "phonetic": None,
             "pos": None
         }  
-    
+    print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> fetch_oxford_audio:")
+    print(">>> word:", word)
+    print(">>> url:", url)
     try:
         response = requests.get(url, headers=headers)
         if response.status_code != 200:
