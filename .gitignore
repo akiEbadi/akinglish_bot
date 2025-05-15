@@ -16,3 +16,4 @@ guide.md
 .env*
 temp*.py
 main_dev.py
+prev_main.py
