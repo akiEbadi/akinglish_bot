@@ -613,8 +613,9 @@ async def process_word(chat_id, word):
             caption = f"🔉 {word} ({pos}) - oxford"
             if phonetic:
                 caption += f"\n📌 /{phonetic}/"
-            get_audio_url(audio_url, preferred, pos, word, chat_id, caption)      
-        else:
+            get_audio_url(audio_url, preferred, pos, word, chat_id, caption)
+                  
+# ----------------- FastAPI Webhook -----------------
 @app.post("/webhook/{token}")
 async def webhook(token: str, request: Request):
     try:
