@@ -462,10 +462,11 @@ def fetch_longman_data(word):
             
             pos_tag = entry.find("span", class_="POS")
             phonetic_tag = entry.find("span", class_="PRON")
+            print(">>> phonetic_tag:", phonetic_tag)
             speakers = entry.find_all("span", class_="speaker")
             print(">>> speakers:", speakers)
 
-            if not pos_tag or not speakers:
+            if (not pos_tag and not in irregular_plural_list) or not speakers:
                 continue
             
             isPhoneticValid = True
@@ -479,6 +480,7 @@ def fetch_longman_data(word):
             
             british_audio = None
             american_audio = None
+            print(">>> get data-src-mp3:")
 
             for spk in speakers:
                 mp3_url = spk.get("data-src-mp3", "")
