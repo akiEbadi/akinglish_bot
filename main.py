@@ -334,6 +334,7 @@ irregular_plural_list = {
   "scarves": "scarf",
   "calves": "calf",
   "hooves": "hoof"
+}
 
 BIO_SPELLING = os.getenv("Irregular_Plural_List")
 if READ_LIST_FROM_ENV and BIO_SPELLING:
@@ -575,7 +576,6 @@ async def process_word(chat_id, word):
         if changed_word_result:
             word = changed_word_result
             print(">>> changed_word_result:", changed_word_result)
-
               
     longman_link = build_longman_link(word)
     oxford_link = build_oxford_link(word)
