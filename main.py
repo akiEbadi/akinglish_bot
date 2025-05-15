@@ -17,6 +17,8 @@ if not TOKEN:
 
 ADMINS = os.getenv("ADMINS", "")
 
+READ_LIST_FROM_ENV = True if os.getenv("READ_LIST_FROM_ENV").lower() == "true" else False
+
 user_preferences = {}  # ذخیره پیش‌فرض تلفظ کاربران
 user_pos = {}  # ذخیره موقعیت تلفظ کاربران (br/us)
 USER_FILE = "users.json"
@@ -66,212 +68,317 @@ def get_user_stats():
         print("❌ خطا در خواندن آمار:", e)
         return {"total": 1, "today": 1, "yesterday": 1}
 # ----------------- LONGMAN PARSER -----------------
-# لیست تبدیل املای آمریکایی به بریتیش
-american_to_british = {
+# لیست تبدیل املای آمریکایی به بریتیش یا برعکس بر اساس لانگمن یا آکسفورد
+equivalnet_spelling_list = {
  'acknowledgement': 'acknowledgment',
  'aluminium': 'aluminum',
- 'anaemia': 'anemia',
- 'analog': 'analog',
- 'analyse': 'analyze',
- 'analyze': 'analyse',
  'anemia': 'anaemia',
+ 'analog': 'analogue',
+#  'analyse': 'analyze',
+ 'analyze': 'analyse',
  'apologise': 'apologize',
- 'apologize': 'apologise',
- 'appal': 'appall',
- 'appals': 'appalls',
+#  'apologize': 'apologise',
+ 'appall': 'appal',
  'appetiser': 'appetizer',
- 'appetizer': 'appetiser',
- 'arbour': 'arbor',
- 'ardour': 'ardor',
- 'armour': 'armor',
+#  'appetizer': 'appetiser',
+ 'arbor': 'arbour',
+ 'ardor': 'ardour',
+ 'armor': 'armour',
  'behavior': 'behaviour',
- 'behaviour': 'behavior',
- 'caecum': 'cecum',
- 'caesium': 'cesium',
- 'caliber': 'calibre',
- 'calibre': 'caliber',
- 'candour': 'candor',
- 'catalogue': 'catalog',
- 'catalyse': 'catalyze',
- 'catalyze': 'catalyse',
- 'cecum': 'caecum',
- 'celiac': 'coeliac',
- 'center': 'centre',
- 'centre': 'center',
+#  'behaviour': 'behavior',
+ 'cecum': 'caecum', # oxford
+ 'caecum': 'cecum',# oxford
+ 'caeca': 'caecum',# oxford - plural
+ 'caecum': 'caecum',# oxford - plural
  'cesium': 'caesium',
+ 'Cs': 'cesium',
+ 'caliber': 'calibre',
+#  'calibre': 'caliber',
+ 'candor': 'candour',
+ 'catalog': 'catalogue',
+ 'catalyze': 'catalyse',
+ 'categorise': 'categorize',
+ 'cecum': 'caecum',
+ 'center': 'centre',
+#  'centre': 'center',
+ 'cesium': 'caesium',
+ 'characterisation': 'characterization',
  'civilise': 'civilize',
- 'civilize': 'civilise',
- 'clamour': 'clamor',
- 'coeliac': 'celiac',
+#  'civilize': 'civilise',
+ 'clamor': 'clamour',
+ 'celiac': 'coeliac',
+ 'coeliac': 'celiac disease',
  'colonise': 'colonize',
  'colonize': 'colonise',
  'color': 'colour',
- 'colour': 'color',
  'counseling': 'counselling',
- 'counselling': 'counseling',
- 'counsellor': 'counselor',
+#  'counselling': 'counseling',
+#  'counsellor': 'counselor',
  'counselor': 'counsellor',
  'criticise': 'criticize',
- 'criticize': 'criticise',
- 'defence': 'defense',
+#  'criticize': 'criticise',
+ 'defence': 'defense', # noun in UK is 'defence', verb is 'defense'
  'defense': 'defence',
- 'demeanour': 'demeanor',
+ 'demeanor': 'demeanour',
  'emphasise': 'emphasize',
- 'emphasize': 'emphasise',
+#  'emphasize': 'emphasise',
  'encyclopaedia': 'encyclopedia',
- 'encyclopedia': 'encyclopaedia',
+#  'encyclopedia': 'encyclopaedia',
  'endeavor': 'endeavour',
- 'endeavour': 'endeavor',
+#  'endeavour': 'endeavor',
  'enrollment': 'enrolment',
- 'enrolment': 'enrollment',
- 'equaling': 'equalling',
- 'equalling': 'equaling',
+#  'enrolment': 'enrollment',
+ 'equaling': 'equal',
+ 'equalling': 'equal',
  'estrogen': 'oestrogen',
  'favorite': 'favourite',
  'favour': 'favor',
  'favourite': 'favorite',
- 'fervour': 'fervor',
+ 'fervor': 'fervour',
  'fiber': 'fibre',
  'fibre': 'fiber',
  'flavor': 'flavour',
- 'flavour': 'flavor',
- 'foetus': 'fetus',
- 'fueled': 'fuelled',
+#  'flavour': 'flavor',
+ 'fetus': 'foetus',
+ 'fueled': 'fuel',
+ 'fuelled': 'fuel',
  'fueling': 'fuelling',
  'fuelled': 'fueled',
- 'fuelling': 'fueling',
- 'fulfil': 'fulfill',
+ 'fueling': 'fuel',
+ 'fuelling': 'fuel',
  'fulfill': 'fulfil',
- 'fulfils': 'fulfills',
+#  'fulfils': 'fulfills',
  'glamor': 'glamour',
- 'glamour': 'glamor',
- 'goitre': 'goiter',
- 'harbour': 'harbor',
- 'honor': 'honour',
+#  'glamour': 'glamor',
+ 'goiter': 'goitre',
+ 'harbor': 'harbour',
+#  'honor': 'honour',
  'honour': 'honor',
- 'humor': 'humour',
+#  'humor': 'humour',
  'humour': 'humor',
  'installment': 'instalment',
- 'instalment': 'installment',
- 'instil': 'instill',
- 'instils': 'instills',
- 'jewellery': 'jewelry',
+#  'instalment': 'installment',
+ 'instill': 'instil',
  'jewelry': 'jewellery',
+#  'jewelry': 'jewellery',
  'kilometer': 'kilometre',
- 'kilometre': 'kilometer',
+#  'kilometre': 'kilometer',
  'labor': 'labour',
- 'labour': 'labor',
+#  'labour': 'labor',
  'leukaemia': 'leukemia',
- 'leukemia': 'leukaemia',
- 'licence': 'license', # noun in UK is 'licence', verb is 'license'
+#  'leukemia': 'leukaemia',
+ 'licence': 'license', # noun in UK is 'licence', verb is 'license' or 'licence'
  'license': 'licence',
  'liter': 'litre',
- 'litre': 'liter',
+#  'litre': 'liter',
  'louver': 'louvre',
- 'louvre': 'louver',
+#  'louvre': 'louver',
  'luster': 'lustre',
- 'lustre': 'luster',
+#  'lustre': 'luster',
  'maneuver': 'manoeuvre',
- 'manoeuvre': 'maneuver',
- 'marvellous': 'marvelous',
+#  'manoeuvre': 'maneuver',
+ 'marvelous': 'marvellous',
  'meager': 'meagre',
- 'meagre': 'meager',
+#  'meagre': 'meager',
  'mediaeval': 'medieval',
- 'medieval': 'mediaeval',
+#  'medieval': 'mediaeval',
  'memorise': 'memorize',
- 'memorize': 'memorise',
+#  'memorize': 'memorise',
  'meter': 'metre',
  'metre': 'meter',
  'minimise': 'minimize',
- 'minimize': 'minimise',
+#  'minimize': 'minimise',
  'modeling': 'modelling',
- 'modelling': 'modeling',
- 'mould': 'mold',
- 'moult': 'molt',
- 'moustache': 'mustache',
+ 'mold': 'mould',
+ 'molt': 'moult',
+ 'mustache': 'moustache',
  'neighbor': 'neighbour',
- 'neighbour': 'neighbor',
+#  'neighbour': 'neighbor',
  'odor': 'odour',
- 'odour': 'odor',
- 'oesophagus': 'esophagus',
+#  'odour': 'odor',
+ 'esophagus': 'oesophagus',
  'oestrogen': 'estrogen',
- 'offence': 'offense',
+#  'offence': 'offense',
  'offense': 'offence',
  'organise': 'organize',
- 'organize': 'organise',
- 'paediatric': 'pediatric',
- 'paediatrician': 'pediatrician',
- 'paedophile': 'pedophile',
- 'paralyse': 'paralyze',
- 'paralyze': 'paralyse',
- 'parlour': 'parlor',
- 'patronise': 'patronize',
- 'patronize': 'patronise',
+#  'organize': 'organise',
+ 'organisation': 'organzsation',
  'pediatric': 'paediatric',
+ 'pediatrician': 'paediatrician',
  'pedophile': 'paedophile',
- 'plough': 'plow',
+#  'paralyse': 'paralyze',
+ 'paralyze': 'paralyse',
+ 'parlor': 'parlour',
+ 'patronise': 'patronize',
+#  'patronize': 'patronise',
+ 'plow': 'plough',
  'practice': 'practise',   # noun in US/UK: practice; verb in UK: practise
  'practise': 'practice',
- 'pretence': 'pretense',
+#  'pretence': 'pretense',
  'pretense': 'pretence',
  'prise': 'prize',
- 'prize': 'prise',
- 'pyjamas': 'pajamas',
- 'quarreling': 'quarrelling',
- 'quarrelling': 'quarreling',
- 'rancour': 'rancor',
+#  'prize': 'prise',
+ 'pajamas': 'pyjamas',
+ 'quarreling': 'quarrel',
+ 'quarrelling': 'quarrel',
+ 'rancor': 'rancour',
  'realise': 'realize',
- 'realize': 'realise',
+#  'realize': 'realise',
  'recognise': 'recognize',
- 'recognize': 'recognise',
- 'revelled': 'reveled',
+#  'recognize': 'recognise',
+ 'reveled': 'revel',
+ 'revelled': 'revel',
  'revelling': 'reveling',
- 'rigour': 'rigor',
+ 'rigor': 'rigour',
  'rumor': 'rumour',
- 'rumour': 'rumor',
+#  'rumour': 'rumor',
  'saber': 'sabre',
- 'sabre': 'saber',
- 'saviour': 'savior',
+#  'sabre': 'saber',
+ 'savior': 'saviour',
  'savor': 'savour',
- 'savour': 'savor',
+#  'savour': 'savor',
  'scepter': 'sceptre',
- 'sceptre': 'scepter',
- 'signaling': 'signalling',
- 'signalling': 'signaling',
- 'skilful': 'skillful',
+#  'sceptre': 'scepter',
+ 'signaling': 'signal',
+ 'signalling': 'signal',
+#  'skilful': 'skillful',
  'skillful': 'skilful',
- 'smoulder': 'smolder',
+ 'smolder': 'smoulder',
  'socialise': 'socialize',
- 'socialize': 'socialise',
+#  'socialize': 'socialise',
  'somber': 'sombre',
- 'sombre': 'somber',
+#  'sombre': 'somber',
  'specialise': 'specialize',
- 'specialize': 'specialise',
+#  'specialize': 'specialise',
  'specter': 'spectre',
- 'spectre': 'specter',
+#  'spectre': 'specter',
  'splendor': 'splendour',
- 'splendour': 'splendor',
- 'succour': 'succor',
+#  'splendour': 'splendor',
+ 'succor': 'succour',
+ 'tarif': 'tariff',
  'theater': 'theatre',
- 'theatre': 'theater',
- 'traveled': 'travelled',
+#  'theatre': 'theater',
+ 'traveled': 'travel',
+ 'travelled': 'travel',
  'traveler': 'traveller',
  'traveling': 'travelling',
- 'travelle': 'traveler',
- 'travelled': 'traveled',
- 'traveller': 'traveler',
- 'travelling': 'traveling',
- 'tumour': 'tumor',
- 'valour': 'valor',
- 'vapour': 'vapor',
+#  'travelle': 'traveler',
+#  'travelled': 'traveled',
+#  'traveller': 'traveler',
+#  'travelling': 'traveling',
+ 'tumor': 'tumour',
+ 'valor': 'valour',
+ 'vapor': 'vapour',
  'vigor': 'vigour',
- 'vigour': 'vigor',
- 'whisky': 'whiskey',
- 'wilful': 'willful'}
-        
+#  'vigour': 'vigor',
+ 'visualisation': 'visualization',
+ 'whiskey': 'whisky',
+ 'whiskey': 'whiskies',
+ 'whiskey': 'whiskeys',
+ 'willful': 'wilful',
+ 'women': 'woman',
+ }
+BIO_SPELLING = os.getenv("Equivalnet_Spelling_List")
+if READ_LIST_FROM_ENV and BIO_SPELLING:
+    with open(BIO_SPELLING, "r") as f:
+        equivalnet_spelling_list = json.load(f)
+
+# Irregular plural forms
+irregular_plural_list = {
+{
+  "children": "child",
+  "feet": "foot",
+  "geese": "goose",
+  "men": "man",
+  "women": "woman",
+  "teeth": "tooth",
+  "mice": "mouse",
+  "lice": "louse",
+  "oxen": "ox",
+  "people": "person",
+  "dice": "die",
+  "cacti": "cactus",
+  "fungi": "fungus",
+  "nuclei": "nucleus",
+  "syllabi": "syllabus",
+  "alumni": "alumnus",
+  "antennae": "antenna",
+  "formulae": "formula",
+  "bacteria": "bacterium",
+  "media": "medium",
+  "data": "datum",
+  "criteria": "criterion",
+  "phenomena": "phenomenon",
+  "theses": "thesis",
+  "analyses": "analysis",
+  "diagnoses": "diagnosis",
+  "parentheses": "parenthesis",
+  "prognoses": "prognosis",
+  "synopses": "synopsis",
+  "axes": "axis",
+  "matrices": "matrix",
+  "vertices": "vertex",
+  "indices": "index",
+  "appendices": "appendix",
+  "beaux": "beau",
+  "chateaux": "chateau",
+  "tableaux": "tableau",
+  "lives": "life",
+  "knives": "knife",
+  "wives": "wife",
+  "leaves": "leaf",
+  "wolves": "wolf",
+  "selves": "self",
+  "elves": "elf",
+  "loaves": "loaf",
+  "halves": "half",
+  "scarves": "scarf",
+  "calves": "calf",
+  "hooves": "hoof"
+}
+
+# Try to reduce to possible base forms
+def get_base_forms(word):
+    base_forms = set()
+    base_forms.add(word)
+
+    # Irregulars
+    if word in irregular_plural_list:
+        base_forms.add(irregular_plural_list[word])
+
+    # Regular patterns
+    if word.endswith('ies'):
+        base_forms.add(re.sub('ies$', 'y', word))
+    if word.endswith('es'):
+        base_forms.add(re.sub('es$', '', word))
+    if word.endswith('s') and not word.endswith('ss'):
+        base_forms.add(re.sub('s$', '', word))
+    if word.endswith('ing'):
+        base_forms.add(re.sub('ing$', '', word))
+        base_forms.add(re.sub('ing$', 'e', word))
+    if word.endswith('ed'):
+        base_forms.add(re.sub('ed$', '', word))
+        base_forms.add(re.sub('ed$', 'e', word))
+
+    return list(base_forms)
+
+# Main function
+def find_word(word):
+    if check_in_dictionary(word):
+        return word  # Found original word
+
+    for base in get_base_forms(word):
+        if base != word and check_in_dictionary(base):
+            return base  # Found base form
+
+    return None  # Not found
+
 def build_longman_link(word):
     return f"https://www.ldoceonline.com/dictionary/{word.lower().replace(' ', '-')}"
-
+BIO_SPELLING = os.getenv("Irregular_Plural_List")
+if READ_LIST_FROM_ENV and BIO_SPELLING:
+    with open(BIO_SPELLING, "r") as f:
+        irregular_plural_list = json.load(f)
 # ----------------- OXFORD PARSER -----------------
 def build_oxford_link(word):
     return f"https://www.oxfordlearnersdictionaries.com/definition/english/{word.lower().replace(' ', '-')}"
@@ -324,7 +431,6 @@ def get_audio_url(audio_url, preferred, pos, word, chat_id, caption):
         res = requests.post(API_URL, json=reply)
         print("📤تلفظ صوتی کلمه وجود ندارد", res.json())
   
-  
 def fetch_longman_data(word):
     url = build_longman_link(word)
     headers = {"User-Agent": "Mozilla/5.0"}
@@ -340,16 +446,20 @@ def fetch_longman_data(word):
         
         for entry in entries:
             headword_tag = entry.find("span", class_="HWD")
+            print(">>> entry:", entry)
+            print(">>> headword_tag:", headword_tag)
+            
             if not headword_tag:
                 continue
-
+        
             headword = headword_tag.get_text(strip=True).lower()
-            if headword != word.lower() and headword != american_to_british.get(word, word):
+            if headword != word.lower() and headword != equivalnet_spelling_list.get(word, word):
                 continue  # فقط مدخل‌هایی که دقیقا خود کلمه هستند
             
             pos_tag = entry.find("span", class_="POS")
             phonetic_tag = entry.find("span", class_="PRON")
             speakers = entry.find_all("span", class_="speaker")
+            print(">>> speakers:", speakers)
 
             if not pos_tag or not speakers:
                 continue
@@ -368,11 +478,13 @@ def fetch_longman_data(word):
 
             for spk in speakers:
                 mp3_url = spk.get("data-src-mp3", "")
+                print(">>> mp3_url:", mp3_url)
+
                 if "breProns" in mp3_url and not british_audio:
                     british_audio = mp3_url
                 elif "ameProns" in mp3_url and not american_audio:
                     american_audio = mp3_url
-
+            # اگر هیچ کدام از صداها پیدا نشد، ادامه بده     
             if british_audio or american_audio:
                 data.append({
                     "pos": pos,
@@ -441,17 +553,27 @@ def fetch_oxford_audio(word, preferred_accent):
 
 # تغییر در تابع اصلی برای استفاده از وویس آکسفورد در صورت عدم پیدا شدن وویس در لانگمن
 async def process_word(chat_id, word):
+    initial_word = word
     fetch_oxford_audio_enabled = False
     original_word = word
     parts_data = fetch_longman_data(word)
 
     # اگر داده‌ای برای تلفظ نبود و معادل بریتیش وجود داشت، اونو امتحان کن
-    if not parts_data and word in american_to_british:
-        alt_word = american_to_british[word]
+    if not parts_data and word in equivalnet_spelling_list:
+        equivalnet_replaced = False
+        alt_word = equivalnet_spelling_list[word]
         parts_data = fetch_longman_data(alt_word)
         if parts_data:
             word = alt_word  # اگر نتیجه داشت، اون کلمه جایگزین بشه
+            equivalnet_replaced = True
+    if READ_LIST_FROM_ENV and not equivalnet_replaced:
+        print(">>> equivalnet_replaced:", equivalnet_replaced)
+        changed_word_result = find_word(word)
+        if changed_word_result:
+            word = changed_word_result
+            print(">>> changed_word_result:", changed_word_result)
 
+              
     longman_link = build_longman_link(word)
     oxford_link = build_oxford_link(word)
 
@@ -477,7 +599,10 @@ async def process_word(chat_id, word):
     
     if(fetch_oxford_audio_enabled):  
         # اگر هیچ وویسی در لانگمن نبود، وویس آکسفورد را امتحان کن
-        oxford_data = fetch_oxford_audio(word,preferred)
+        oxford_data = fetch_oxford_audio(initial_word,preferred)
+        if not oxford_data:
+            print(">>> not oxford_data => oxford_data:", oxford_data)
+            oxford_data = fetch_oxford_audio(word,preferred)
         if oxford_data:
             pos = oxford_data.get('pos') if oxford_data.get('pos') else ""
             phonetic = oxford_data.get('phonetic') if oxford_data.get('phonetic') else ""
@@ -486,7 +611,7 @@ async def process_word(chat_id, word):
             if phonetic:
                 caption += f"\n📌 /{phonetic}/"
             get_audio_url(audio_url, preferred, pos, word, chat_id, caption)      
-
+        else:
 @app.post("/webhook/{token}")
 async def webhook(token: str, request: Request):
     try:
