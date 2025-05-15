@@ -457,7 +457,7 @@ def fetch_longman_data(word):
                 continue
         
             headword = headword_tag.get_text(strip=True).lower()
-            if headword != word.lower() and headword != equivalnet_spelling_list.get(word, word):
+            if headword != word.lower() and headword != equivalnet_spelling_list.get(word, None):
                 continue  # فقط مدخل‌هایی که دقیقا خود کلمه هستند
             
             pos_tag = entry.find("span", class_="POS")
@@ -465,11 +465,13 @@ def fetch_longman_data(word):
             print(">>> phonetic_tag:", phonetic_tag)
             speakers = entry.find_all("span", class_="speaker")
             print(">>> pos_tag:", pos_tag)
-            print(">>> word not in irregular_plural_list:", word not in irregular_plural_list)
+            print(">>> irregular_plural_list.get(word, None):", irregular_plural_list.get(word, None))
 
-            if (not pos_tag and word not in irregular_plural_list) or not speakers:
+
+            if (not pos_tag and word != irregular_plural_list.get(word, None)) or not speakers:
                 continue
             
+            print(">>> irregular_plural_list:", irregular_plural_list)
             isPhoneticValid = True
             if phonetic_tag is not None:
                 isPhoneticValid = has_invalid_parent_class(phonetic_tag)
