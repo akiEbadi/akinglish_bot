@@ -466,7 +466,7 @@ def fetch_longman_data(word):
             speakers = entry.find_all("span", class_="speaker")
             print(">>> speakers:", speakers)
 
-            if (not pos_tag and not in irregular_plural_list) or not speakers:
+            if (not pos_tag and word not in irregular_plural_list) or not speakers:
                 continue
             
             isPhoneticValid = True
