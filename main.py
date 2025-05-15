@@ -606,14 +606,16 @@ async def process_word(chat_id, word):
         caption = f"🔉 {word} ({pos}) - longman"
         if phonetic:
             caption += f"\n📌 /{phonetic}/ "
-        get_audio_url(audio_url, preferred, pos, word, chat_id, caption)
+        await get_audio_url(audio_url, preferred, pos, word, chat_id, caption)
     
     if(fetch_oxford_audio_enabled):  
         # اگر هیچ وویسی در لانگمن نبود، وویس آکسفورد را امتحان کن
-        oxford_data = fetch_oxford_audio(initial_word,preferred)
+        print(">>> initial_word:", initial_word)
+        oxford_data = await fetch_oxford_audio(initial_word,preferred)
+        print(">>> word:", word)
         if not oxford_data:
             print(">>> not oxford_data => oxford_data:", oxford_data)
-            oxford_data = fetch_oxford_audio(word,preferred)
+            oxford_data = await fetch_oxford_audio(word,preferred)
         if oxford_data:
             pos = oxford_data.get('pos') if oxford_data.get('pos') else ""
             phonetic = oxford_data.get('phonetic') if oxford_data.get('phonetic') else ""
