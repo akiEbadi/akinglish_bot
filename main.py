@@ -499,6 +499,7 @@ async def fetch_oxford_data(word, preferred_accent = "american"):
     url = build_oxford_link(word)
     headers = {"User-Agent": "Mozilla/5.0"}
     data = []  
+    
     try:
         response = requests.get(url, headers=headers)
         if response.status_code != 200:
@@ -507,7 +508,11 @@ async def fetch_oxford_data(word, preferred_accent = "american"):
             return data
 
         soup = BeautifulSoup(response.text, "html.parser")
-        
+        print("🔍 دریافت صفحه آکسفورد:", url)
+        print("response.text", response.text)
+        print("oxford soup", soup)
+        soup
+        if not soup return data
         # استخراج لینک mp3
         accent_class = 'pron-us' if preferred_accent == 'american' else 'pron-uk'
 
@@ -608,11 +613,9 @@ async def process_word(chat_id, word):
         res = requests.post(API_URL, json=reply)
         print("📤تلفظ صوتی کلمه وجود ندارد", res.json())
         return    
-    if longman_data_fetched:
-        longman_link = longman_data[0].get('url') if len(longman_data)>0 else None
+    longman_link = longman_data[0].get('url') if (longman_data_fetched and len(longman_data)>0) else None
 
-    if oxford_data_fetched:
-        oxford_link = oxford_data[0].get('url') if len(oxford_data)>0 else None
+    oxford_link = oxford_data[0].get('url') if (oxford_data_fetched and len(oxford_data)>0) else None
     
     longman_replaced_word = longman_word if longman_equivalnet_replaced else word
     oxford_replaced_word = oxford_word if oxford_equivalnet_replaced else word
