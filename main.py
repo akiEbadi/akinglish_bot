@@ -1,4 +1,3 @@
-
 from fastapi import FastAPI, Request
 import os
 import requests
@@ -18,8 +17,11 @@ if not TOKEN:
 ADMINS = os.getenv("ADMINS", "")
 
 READ_LIST_FROM_ENV = True if os.getenv("READ_LIST_FROM_ENV").lower() == "true" else False
+READ_LIST_FROM_ENV = False
 
-user_preferences = {}  # ذخیره پیش‌فرض تلفظ کاربران
+ # ذخیره پیش‌فرض تلفظ کاربران
+user_dic_preference = {}
+user_accent_preference = {}
 user_pos = {}  # ذخیره موقعیت تلفظ کاربران (br/us)
 USER_FILE = "users.json"
 
@@ -39,8 +41,7 @@ def save_user(user_id):
             users[str(user_id)] = datetime.now().strftime("%Y-%m-%d")
             with open(USER_FILE, "w") as f:
                 json.dump(users, f)
-            print("User saved successfully")
-            print(">>>> users", users)
+            print(">>>>>>>>>>>>>>>>> Users:", users)
     except Exception as e:
         print("❌ خطا در ذخیره کاربر:", e)
 
@@ -52,7 +53,6 @@ def get_user_stats():
         with open(USER_FILE, "r") as f:
             users = json.load(f)
         total = len(users)
-        print(">>> users count:", total)
         today = date.today().isoformat()
         yesterday = (date.today() - timedelta(days=1)).isoformat()
 
@@ -341,41 +341,33 @@ if READ_LIST_FROM_ENV and BIO_SPELLING:
     with open(BIO_SPELLING, "r") as f:
         irregular_plural_list = json.load(f)
         
-# Try to reduce to possible base forms
-def get_base_forms(word):
-    base_forms = set()
-    base_forms.add(word)
-
+# find possible forms
+def find_alternative_words(word):
+    alternative_words = [word]
+    
+    # Check for equivalent spelling
+    if word in equivalnet_spelling_list:
+        alternative_words.append(equivalnet_spelling_list[word])
     # Irregulars
     if word in irregular_plural_list:
-        base_forms.add(irregular_plural_list[word])
+        alternative_words.append(irregular_plural_list[word])
 
     # Regular patterns
     if word.endswith('ies'):
-        base_forms.add(re.sub('ies$', 'y', word))
+        alternative_words.append(re.sub('ies$', 'y', word))
     if word.endswith('es'):
-        base_forms.add(re.sub('es$', '', word))
+        alternative_words.append(re.sub('es$', '', word))
     if word.endswith('s') and not word.endswith('ss'):
-        base_forms.add(re.sub('s$', '', word))
+        alternative_words.append(re.sub('s$', '', word))
     if word.endswith('ing'):
-        base_forms.add(re.sub('ing$', '', word))
-        base_forms.add(re.sub('ing$', 'e', word))
+        alternative_words.append(re.sub('ing$', '', word))
+        alternative_words.append(re.sub('ing$', 'e', word))
     if word.endswith('ed'):
-        base_forms.add(re.sub('ed$', '', word))
-        base_forms.add(re.sub('ed$', 'e', word))
+        alternative_words.append(re.sub('ed$', '', word))
+        alternative_words.append(re.sub('ed$', 'e', word))
 
-    return list(base_forms)
+    return list(alternative_words)
 
-# Main function
-def find_word(word):
-    if check_in_dictionary(word):
-        return word  # Found original word
-
-    for base in get_base_forms(word):
-        if base != word and check_in_dictionary(base):
-            return base  # Found base form
-
-    return None  # Not found
 
 def build_longman_link(word):
     return f"https://www.ldoceonline.com/dictionary/{word.lower().replace(' ', '-')}"
@@ -398,14 +390,15 @@ def has_invalid_parent_class(element):
             return True
     return False
 
-def get_audio_url(audio_url, preferred, pos, word, chat_id, caption):
+async def get_audio_url(audio_url, preferred_accent, pos, word, chat_id, caption):
     if audio_url:
         try:
             headers = {"User-Agent": "Mozilla/5.0"}
             response = requests.get(audio_url, headers=headers)
+
             if response.status_code == 200 and response.headers["Content-Type"].startswith("audio"):
                 safe_word = re.sub(r'[^\w\-]+', '_', word)
-                file_name = f"{safe_word}_{preferred}_{pos}.mp3"
+                file_name = f"{safe_word}_{preferred_accent}_{pos}.mp3"
 
                 with open(file_name, "wb") as f:
                     f.write(response.content)
@@ -426,22 +419,15 @@ def get_audio_url(audio_url, preferred, pos, word, chat_id, caption):
             } 
             res = requests.post(API_URL, json=error_reply)
             print("📤 ارسال پیام خطا:", res.json())
-    else:
-        fetch_oxford_audio_enabled = True
-        reply = {
-            "chat_id": chat_id,
-            "text": f"❌تلفظ صوتی کلمه وجود ندارد"
-        }
-        res = requests.post(API_URL, json=reply)
-        print("📤تلفظ صوتی کلمه وجود ندارد", res.json())
   
-def fetch_longman_data(word):
+async def fetch_longman_data(word, preferred_accent = "american"):
     url = build_longman_link(word)
     headers = {"User-Agent": "Mozilla/5.0"}
     try:
         response = requests.get(url, headers=headers)
         if response.status_code != 200:
             return []
+        accent_class = 'pron-us' if preferred_accent == 'american' else 'pron-uk'
 
         soup = BeautifulSoup(response.text, "html.parser")
         data = []
@@ -450,8 +436,6 @@ def fetch_longman_data(word):
         
         for entry in entries:
             headword_tag = entry.find("span", class_="HWD")
-            print(">>> entry:", entry)
-            print(">>> headword_tag:", headword_tag)
             
             if not headword_tag:
                 continue
@@ -459,48 +443,50 @@ def fetch_longman_data(word):
             headword = headword_tag.get_text(strip=True).lower()
             if headword != word.lower() and headword != equivalnet_spelling_list.get(word, word):
                 continue  # فقط مدخل‌هایی که دقیقا خود کلمه هستند
-            print(">>> headword:", headword)
 
             pos_tag = entry.find("span", class_="POS")
             phonetic_tag = entry.find("span", class_="PRON")
-            print(">>> phonetic_tag:", phonetic_tag)
             speakers = entry.find_all("span", class_="speaker")
-            print(">>> pos_tag:", pos_tag)
-            print(">>> irregular_plural_list.get(word, None):", irregular_plural_list.get(word, None))
 
 
-            if (not pos_tag and word != irregular_plural_list.get(word, None)) or not speakers:
+            if (not pos_tag and word not in irregular_plural_list) or not speakers:
                 continue
             
-            print(">>> irregular_plural_list:", irregular_plural_list)
             isPhoneticValid = True
             if phonetic_tag is not None:
                 isPhoneticValid = has_invalid_parent_class(phonetic_tag)
                 if(isPhoneticValid):
                     phonetic_tag = None 
-
-            pos = pos_tag.get_text(strip=True)
-            phonetic = phonetic_tag.get_text(strip=True) if phonetic_tag else None
-            
+            if pos_tag:
+                pos = pos_tag.get_text(strip=True)
+            else:
+                pos = ""
+            if phonetic_tag:
+                phonetic = phonetic_tag.get_text(strip=True) if phonetic_tag else None
+            else:
+                phonetic = ""
+            audio_url = None
             british_audio = None
             american_audio = None
-            print(">>> get data-src-mp3:")
 
             for spk in speakers:
                 mp3_url = spk.get("data-src-mp3", "")
-                print(">>> mp3_url:", mp3_url)
 
                 if "breProns" in mp3_url and not british_audio:
                     british_audio = mp3_url
                 elif "ameProns" in mp3_url and not american_audio:
                     american_audio = mp3_url
             # اگر هیچ کدام از صداها پیدا نشد، ادامه بده     
-            if british_audio or american_audio:
+            if (preferred_accent == 'british' and british_audio) or (preferred_accent == 'american' and american_audio):
+                audio_url = british_audio if preferred_accent == 'british' else american_audio
                 data.append({
+                    "word": word,
+                    "url": url,
                     "pos": pos,
                     "phonetic": phonetic,
-                    "british": british_audio,
-                    "american": american_audio
+                    "audio_url": audio_url,
+                    # "british": british_audio,
+                    # "american": american_audio
                 })
 
         return data
@@ -509,26 +495,20 @@ def fetch_longman_data(word):
         print(f"⚠️ خطا در واکشی اطلاعات لانگمن: {e}")
         return []
 
-def fetch_oxford_audio(word, preferred_accent):
+async def fetch_oxford_data(word, preferred_accent = "american"):
     url = build_oxford_link(word)
     headers = {"User-Agent": "Mozilla/5.0"}
-    data = {
-            "audio_url": None,
-            "phonetic": None,
-            "pos": None
-        }  
-    print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> fetch_oxford_audio:")
-    print(">>> word:", word)
-    print(">>> url:", url)
+    data = []  
     try:
         response = requests.get(url, headers=headers)
         if response.status_code != 200:
             print(f"❌ دریافت صفحه آکسفورد ناموفق بود. Status: {response.status_code}")
+            alt_url = build_oxford_link(word)
             return data
 
         soup = BeautifulSoup(response.text, "html.parser")
         
-           # استخراج لینک mp3
+        # استخراج لینک mp3
         accent_class = 'pron-us' if preferred_accent == 'american' else 'pron-uk'
 
         audio_div = soup.find('div', class_=lambda c: c and
@@ -552,11 +532,13 @@ def fetch_oxford_audio(word, preferred_accent):
             return data   
 
         # بازگشت اطلاعات به همراه POS و تلفظ صوتی
-        data = {
+        data.append({
+            "word": word, 
+            "url": url,
             "audio_url": audio_url,
             "phonetic": phonetic,
             "pos": pos
-        }
+        })
         return data    
 
     except Exception as e:
@@ -566,65 +548,127 @@ def fetch_oxford_audio(word, preferred_accent):
 # تغییر در تابع اصلی برای استفاده از وویس آکسفورد در صورت عدم پیدا شدن وویس در لانگمن
 async def process_word(chat_id, word):
     initial_word = word
-    fetch_oxford_audio_enabled = False
+    longman_word = word
+    oxford_word = word
+    longman_data_fetched = False
+    oxford_data_fetched = False
     original_word = word
-    parts_data = fetch_longman_data(word)
+    preferred_dic = user_dic_preference.get(chat_id, "longman_oxford")
+    preferred_accent = user_accent_preference.get(chat_id, "american")
+    fetch_longman_enabled = True if preferred_dic == "longman" or preferred_dic == "longman_oxford" else False
+    fetch_oxford_enabled = True if preferred_dic == "oxford" or preferred_dic == "longman_oxford" else False
+    fetch_both_dic_enabled = True if preferred_dic == "longman_oxford" else False
 
-    # اگر داده‌ای برای تلفظ نبود و معادل بریتیش وجود داشت، اونو امتحان کن
-    if not parts_data and word in equivalnet_spelling_list:
-        equivalnet_replaced = False
-        alt_word = equivalnet_spelling_list[word]
-        parts_data = fetch_longman_data(alt_word)
-        if parts_data:
-            word = alt_word  # اگر نتیجه داشت، اون کلمه جایگزین بشه
-            equivalnet_replaced = True
-    if READ_LIST_FROM_ENV and not equivalnet_replaced:
-        print(">>> equivalnet_replaced:", equivalnet_replaced)
-        changed_word_result = find_word(word)
-        if changed_word_result:
-            word = changed_word_result
-            print(">>> changed_word_result:", changed_word_result)
-              
-    longman_link = build_longman_link(word)
-    oxford_link = build_oxford_link(word)
+    if fetch_longman_enabled:
+        longman_data = await fetch_longman_data(word, preferred_accent)
+    else:
+        longman_data = None
+    if longman_data:
+        longman_data_fetched = True
+    else:
+        longman_data_fetched = False
+    
+    if fetch_oxford_enabled:
+        oxford_data = await fetch_oxford_data(word, preferred_accent)
+    else:
+        oxford_data = None
+    if oxford_data:
+        oxford_data_fetched = True
+    else:
+        oxford_data = await fetch_oxford_data(f"{word.lower()}1", preferred_accent)
+        oxford_data_fetched = True if oxford_data else False
 
+        
+    alternative_words = find_alternative_words(word)
+    longman_equivalnet_replaced = False
+    oxford_equivalnet_replaced = False
+
+    if fetch_longman_enabled and not longman_data_fetched and len(alternative_words) > 0:
+        for alt_word in alternative_words:
+            longman_data = await fetch_longman_data(alt_word, preferred_accent)
+            if longman_data:
+                longman_word = alt_word  # اگر نتیجه داشت، اون کلمه جایگزین بشه
+                longman_equivalnet_replaced = True
+                longman_data_fetched = True
+                break
+
+    if fetch_oxford_enabled and not oxford_data_fetched and len(alternative_words) > 0:
+        for alt_word in alternative_words:
+            oxford_data = await fetch_oxford_data(alt_word, preferred_accent)
+            if oxford_data:
+                oxford_word = alt_word  # اگر نتیجه داشت، اون کلمه جایگزین بشه
+                oxford_equivalnet_replaced = True
+                oxford_data_fetched = True
+                break
+    if (fetch_both_dic_enabled and not longman_data_fetched and not oxford_data_fetched) or (not longman_data_fetched and not oxford_data_fetched and word == original_word):
+        reply = {
+            "chat_id": chat_id,
+            "text": f"❌کلمه یا تلفظ صوتی کلمه در دیکشنری یا دیکشنری های مورد نظر وجود ندارد وجود ندارد"
+        }
+        res = requests.post(API_URL, json=reply)
+        print("📤تلفظ صوتی کلمه وجود ندارد", res.json())
+        return    
+    if longman_data_fetched:
+        longman_link = longman_data[0].get('url') if len(longman_data)>0 else None
+
+    if oxford_data_fetched:
+        oxford_link = oxford_data[0].get('url') if len(oxford_data)>0 else None
+    
+    longman_replaced_word = longman_word if longman_equivalnet_replaced else word
+    oxford_replaced_word = oxford_word if oxford_equivalnet_replaced else word
+    if(fetch_both_dic_enabled):
+        message = f"کلمه: {original_word}\n\n📚 Longman: {longman_link}\n📖 Oxford: {oxford_link}"
+    elif fetch_longman_enabled and longman_data_fetched:
+        message = f"کلمه: {original_word}\n\n📚 Longman: {longman_link}"
+    elif fetch_oxford_enabled and oxford_data_fetched:
+        message = f"کلمه: {original_word}\n\n📖 Oxford: {oxford_link}"
+    else:
+        message = "این کلمه در دیکشنری های مورد نظر وجود ندارد"
     reply = {
         "chat_id": chat_id,
-        "text": f"کلمه: {original_word}\n\n📚 Longman: {longman_link}\n📖 Oxford: {oxford_link}"
+        "text": message
     }
-    res = requests.post(API_URL, json=reply)
+    res = requests.post(API_URL, json=reply)           
 
-    preferred = user_preferences.get(chat_id, "american")
-    
-    if len(parts_data) == 0: fetch_oxford_audio_enabled = True
-    
-    for entry in parts_data:
-        pos = entry['pos']
-        phonetic = entry['phonetic']
-        audio_url = entry[preferred]
-
-        caption = f"🔉 {word} ({pos}) - longman"
-        if phonetic:
-            caption += f"\n📌 /{phonetic}/ "
-        await get_audio_url(audio_url, preferred, pos, word, chat_id, caption)
-    
-    if(fetch_oxford_audio_enabled):  
-        # اگر هیچ وویسی در لانگمن نبود، وویس آکسفورد را امتحان کن
-        print(">>> initial_word:", initial_word)
-        oxford_data = await fetch_oxford_audio(initial_word,preferred)
-        print(">>> word:", word)
-        if not oxford_data:
-            print(">>> not oxford_data => oxford_data:", oxford_data)
-            oxford_data = await fetch_oxford_audio(word,preferred)
-        if oxford_data:
-            pos = oxford_data.get('pos') if oxford_data.get('pos') else ""
-            phonetic = oxford_data.get('phonetic') if oxford_data.get('phonetic') else ""
-            audio_url = oxford_data.get('audio_url') if oxford_data.get('audio_url') else ""
-            caption = f"🔉 {word} ({pos}) - oxford"
+    if longman_data_fetched:
+        for entry in longman_data:
+            pos = entry['pos']
+            phonetic = entry['phonetic']
+            audio_url = entry['audio_url']
+            # entry[preferred_accent]
+            pos_caption = f"({pos})" if pos else ""
+            caption = f"🔉 {longman_replaced_word} {pos_caption} - longman"
+            if phonetic:
+                caption += f"\n📌 /{phonetic}/ "
+            await get_audio_url(audio_url, preferred_accent, pos, longman_word, chat_id, caption)
+    elif fetch_longman_enabled:
+        reply = {
+            "chat_id": chat_id,
+            "text": f"❌کلمه یا تلفظ صوتی کلمه در دیکشنری لانگمن وجود ندارد وجود ندارد"
+        }
+        res = requests.post(API_URL, json=reply)
+        print("📤تلفظ صوتی کلمه وجود ندارد", res.json())
+        return 
+        
+    if oxford_data_fetched:
+        for entry in oxford_data:
+            pos = entry['pos']
+            phonetic = entry['phonetic']
+            audio_url = entry['audio_url']
+            pos_caption = f"({pos})" if pos else ""
+            caption = f"🔉 {oxford_replaced_word} {pos_caption} - oxford"
             if phonetic:
                 caption += f"\n📌 /{phonetic}/"
-            get_audio_url(audio_url, preferred, pos, word, chat_id, caption)
-                  
+            await get_audio_url(audio_url, preferred_accent, pos, oxford_word, chat_id, caption)
+    elif oxford_data_fetched:    
+        reply = {
+            "chat_id": chat_id,
+            "text": f"❌کلمه یا تلفظ صوتی کلمه در دیکشنری آکسفورد وجود ندارد وجود ندارد"
+        }
+        res = requests.post(API_URL, json=reply)
+        print("📤تلفظ صوتی کلمه وجود ندارد", res.json())
+        return 
+    
 # ----------------- FastAPI Webhook -----------------
 @app.post("/webhook/{token}")
 async def webhook(token: str, request: Request):
@@ -656,7 +700,7 @@ async def webhook(token: str, request: Request):
                 print("📤 ارسال پیام خوش‌آمد:")
 
             elif text == "/british":
-                user_preferences[chat_id] = "british"
+                user_accent_preference[chat_id] = "british"
                 reply = {
                     "chat_id": chat_id,
                     "text": "✅ تلفظ پیش‌فرض روی 🇬🇧 British تنظیم شد!"
@@ -665,14 +709,37 @@ async def webhook(token: str, request: Request):
                 print("📤 ارسال تغییر تنظیم British:")
 
             elif text == "/american":
-                user_preferences[chat_id] = "american"
+                user_accent_preference[chat_id] = "american"
                 reply = {
                     "chat_id": chat_id,
                     "text": "✅ تلفظ پیش‌فرض روی 🇬🇧 American تنظیم شد!"
                 }
                 res = requests.post(API_URL, json=reply)
                 print("📤 جواب به تلگرام ارسال شد:")
-                
+            elif text == "/longman":
+                user_dic_preference[chat_id] = "longman"
+                reply = {
+                    "chat_id": chat_id,
+                    "text": "✅ دیکشنری پیش‌فرض روی دیکشنری لانگمن تنظیم شد!"
+                }
+                res = requests.post(API_URL, json=reply)
+                print("📤 جواب به تلگرام ارسال شد:")
+            elif text == "/oxford":
+                user_dic_preference[chat_id] = "oxford"
+                reply = {
+                    "chat_id": chat_id,
+                    "text": "✅ دیکشنری پیش‌فرض روی دیکشنری آکسفورد تنظیم شد!"
+                }
+                res = requests.post(API_URL, json=reply)
+                print("📤 جواب به تلگرام ارسال شد:") 
+            elif text == "/longman_oxford":
+                user_dic_preference[chat_id] = "longman_oxford"
+                reply = {
+                    "chat_id": chat_id,
+                    "text": "✅ دیکشنری پیش‌فرض روی هر دو دیکشنری لانگمن و آکسفورد تنظیم شد!"
+                }
+                res = requests.post(API_URL, json=reply)
+                print("📤 جواب به تلگرام ارسال شد:")   
             elif text == "/stats":
                 if str(user_id) not in ADMINS:
                     reply = {
