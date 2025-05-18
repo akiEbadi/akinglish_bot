@@ -512,7 +512,8 @@ async def fetch_oxford_data(word, preferred_accent = "american"):
         print("response.text", response.text)
         print("oxford soup", soup)
         soup
-        if not soup return data
+        if not soup:
+            return data
         # استخراج لینک mp3
         accent_class = 'pron-us' if preferred_accent == 'american' else 'pron-uk'
 
