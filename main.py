@@ -14,10 +14,10 @@ TOKEN = os.getenv("TOKEN")
 if not TOKEN:
     raise ValueError("TOKEN is not set!")
 
-ADMINS = os.getenv("ADMINS", "")
+ADMINS = [a.strip() for a in os.getenv("ADMINS", "").split(",") if a.strip()]
 
-READ_LIST_FROM_ENV = True if os.getenv("READ_LIST_FROM_ENV").lower() == "true" else False
-READ_LIST_FROM_ENV = False
+
+READ_LIST_FROM_ENV = os.getenv("READ_LIST_FROM_ENV", "false").lower() == "true"
 
  # ذخیره پیش‌فرض تلفظ کاربران
 user_dic_preference = {}
