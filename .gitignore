@@ -18,3 +18,4 @@ temp*.py
 main_dev.py
 main_local.py
 prev_main.py
+install.bat
